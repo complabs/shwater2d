@@ -378,8 +378,7 @@ void ShallowWater2D::SaveData( const std::string filename )
 */
 int main( int argc, char** argv )
 {
-    // ShallowWater2D shWater( /* m */ 1024, /* n */ 1024, /* tEnd */ 0.1 );
-    ShallowWater2D shWater( /* m */ 512, /* n */ 512, /* tEnd */ 0.1 );
+    ShallowWater2D shWater( /* m */ 1024, /* n */ 1024, /* tEnd */ 0.1 );
 
     shWater.InitialData ();
 
