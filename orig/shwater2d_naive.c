@@ -98,6 +98,8 @@ void solver(double *Q, double **ffx, double **ffy, double **nFx, double **nFy,
   double time, stime;
   int i, j, k, steps;
   
+    stime = gettime();
+
   steps = ceil(tend / dt); 
 #pragma omp parallel private(i, j, k, time, ffx, ffy, nFx, nFy)
   {
@@ -118,8 +120,6 @@ void solver(double *Q, double **ffx, double **ffy, double **nFx, double **nFy,
       ffy[i] =  ffy[0] + i * n;
       nFy[i] =  nFy[0] + i * n;
     }
-#pragma omp master
-    stime = gettime();
     for (i = 0, time = 0.0; i < steps; i++, time += dt) { 
 
       /* Apply boundary condition */
@@ -143,8 +143,6 @@ void solver(double *Q, double **ffx, double **ffy, double **nFx, double **nFy,
       laxf_scheme_2d(Q, ffx, ffy, nFx, nFy, m, n, dx, dy, dt);  
   
     }
-#pragma omp master    
-    printf("Solver took %g seconds\n", gettime() - stime);
 
     free(ffx[0]);
     free(ffy[0]);
@@ -156,6 +154,8 @@ void solver(double *Q, double **ffx, double **ffy, double **nFx, double **nFy,
     free(nFx);
     free(nFy);    
   }
+
+    printf("Solver took %g seconds\n", gettime() - stime);
 }
   
 /*
@@ -177,8 +177,8 @@ int main(int argc, char **argv) {
   
 
   /* Use m volumes in the x-direction and n volumes in the y-direction */    
-  m = 1000;
-  n = 1000;
+  m = 512;
+  n = 512;
   
   /*
     epsi      Parameter used for initial condition
@@ -233,7 +233,9 @@ int main(int argc, char **argv) {
 
 
   /* Uncomment this line if you want visualize the result in ParaView */
-  /* save_vtk(Q, x, y, m, n); */
+  extern void save_vtk(double *Q, double *x, double *y, int m, int n);
+  save_vtk(Q, x, y, m, n);
+
 
 
   free(Q);

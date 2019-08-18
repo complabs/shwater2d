@@ -6,3 +6,4 @@ obj
 *.o
 shwater2d
 orig/shwater2d
+orig/shwater2d_naive
