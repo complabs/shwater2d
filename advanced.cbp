@@ -23,7 +23,6 @@
 			<Add option="-fopenmp" />
 		</Compiler>
 		<Unit filename="shwater2d.cpp" />
-		<Unit filename="vtk_export.cpp" />
 		<Extensions>
 			<code_completion />
 			<debugger />

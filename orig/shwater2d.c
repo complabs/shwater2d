@@ -152,8 +152,8 @@ int main(int argc, char **argv) {
   
 
   /* Use m volumes in the x-direction and n volumes in the y-direction */    
-  m = 1000;
-  n = 1000;
+  m = 512;
+  n = 512;
   
   /*
     epsi      Parameter used for initial condition
@@ -230,7 +230,8 @@ int main(int argc, char **argv) {
 
 
   /* Uncomment this line if you want visualize the result in ParaView */
-  /* save_vtk(Q, x, y, m, n); */
+  extern void save_vtk(double *Q, double *x, double *y, int m, int n);
+  save_vtk(Q, x, y, m, n);
 
 
   free(Q);
@@ -249,6 +250,4 @@ int main(int argc, char **argv) {
 
   return 0;    
 }
-
-
 

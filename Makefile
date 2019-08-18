@@ -1,5 +1,6 @@
 CXX = g++
 CXXFLAGS = -O2 -fopenmp
+CPPFLAGS = -DEXPORT_VTK
 
 ifeq ($(CRAY_PRGENVCRAY), loaded)
 CXX = CC
@@ -14,7 +15,7 @@ endif
 
 OBJS = ${SRC:.cpp=.o}
 
-SRC = vtk_export.cpp shwater2d.cpp
+SRC = shwater2d.cpp
 DEST = shwater2d
 
 all: $(DEST)
@@ -24,7 +25,8 @@ $(DEST): $(OBJS)
 
 clean:
 	rm -f $(DEST) *.o
+	rm -f bin obj *.vtk
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $<
 
