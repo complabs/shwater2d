@@ -1,0 +1,8 @@
+*.vtk
+bin
+obj
+*.layout
+*.depend
+*.o
+shwater2d
+orig/shwater2d
