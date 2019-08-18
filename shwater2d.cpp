@@ -175,12 +175,14 @@ void shwater2d ()
 {
     int    m     = 1000;                   // Use m volumes in the x-direction
     int    n     = 1000;                   // Use n volumes in the y-direction
-    double epsi  = 2.0;                    // Parameter used for initial condition
-    double delta = 0.5;                    // Parameter used for initial condition
-    double dx    = ( xend - xstart ) / m;  // Distance between two volumes (x-direction)
-    double dy    = ( yend - ystart ) / n;  // Distance between two volumes (y-direction)
-    double dt    = dx / sqrt( 9.81 * 5.0); // Time step
-    double tend  = 0.1;                    // End time
+
+    double epsi  = 2.0;                    // Parameter used for the initial condition
+    double delta = 0.5;                    // Parameter used for the initial condition
+
+    double dx   = ( xend - xstart ) / m;   // Distance between two volumes (x-direction)
+    double dy   = ( yend - ystart ) / n;   // Distance between two volumes (y-direction)
+    double dt   = dx / sqrt( 9.81 * 5.0 ); // Time step
+    double tend = 0.1;                     // End time
 
     // Add two ghost volumes at each side of the domain
     //
@@ -189,22 +191,21 @@ void shwater2d ()
 
     // Allocate memory for the domain
     //
-    double* Q = (double*) malloc(m * n * cell_size *  sizeof(double));
-
-    double* x = (double*) malloc(m * sizeof(double));
-    double* y = (double*) malloc(n * sizeof(double));
+    double* Q = new double[ m * n * cell_size ];
+    double* x = new double[ m ];
+    double* y = new double[ n ];
 
     // Allocate memory for fluxes
     //
-    double** ffx = (double**) malloc(cell_size * sizeof(double *));
-    double** ffy = (double**) malloc(cell_size * sizeof(double *));
-    double** nFx = (double**) malloc(cell_size * sizeof(double *));
-    double** nFy = (double**) malloc(cell_size * sizeof(double *));
+    double** ffx = new double*[ cell_size ];
+    double** ffy = new double*[ cell_size ];
+    double** nFx = new double*[ cell_size ];
+    double** nFy = new double*[ cell_size ];
 
-    ffx[0] = (double*) malloc(cell_size * m * sizeof(double));
-    ffy[0] = (double*) malloc(cell_size * m * sizeof(double));
-    nFx[0] = (double*) malloc(cell_size * n * sizeof(double));
-    nFy[0] = (double*) malloc(cell_size * n * sizeof(double));
+    ffx[0] = new double[ cell_size * m ];
+    ffy[0] = new double[ cell_size * m ];
+    nFx[0] = new double[ cell_size * n ];
+    nFy[0] = new double[ cell_size * n ];
 
     for( int i = 0; i < cell_size; ++i )
     {
@@ -224,7 +225,7 @@ void shwater2d ()
         y[i] = tmp + i * dy;
     }
 
-    // Set initial Gauss hump
+    // Set the initial Gauss hump
     //
     for( int i = 0; i < m; ++i )
     {
@@ -259,19 +260,19 @@ void shwater2d ()
     //
     save_vtk( Q, x, y, m, n );
 
-    free(Q);
-    free(x);
-    free(y);
+    delete[] Q;
+    delete[] x;
+    delete[] y;
 
-    free(ffx[0]);
-    free(ffy[0]);
-    free(nFx[0]);
-    free(nFy[0]);
+    delete[] ffx[0];
+    delete[] ffy[0];
+    delete[] nFx[0];
+    delete[] nFy[0];
 
-    free(ffx);
-    free(ffy);
-    free(nFx);
-    free(nFy);
+    delete[] ffx;
+    delete[] ffy;
+    delete[] nFx;
+    delete[] nFy;
 }
 
 int main( int argc, char** argv )
