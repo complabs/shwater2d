@@ -142,7 +142,6 @@ public:
                 {
                     if( ! std::isfinite( Q( k, j, i ) ) )
                     {
-                        #pragma omp critical
                         {
                             std::cerr << std::endl << "Invalid solution!" 
                                 << std::endl << std::endl;
@@ -203,7 +202,6 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
 {
     // Calculate and update the fluxes in the x-direction
     //
-    #pragma omp for
     for( int i = 1; i < n; ++i )
     {
         calculate_ffx( ffx, i );
@@ -223,7 +221,6 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
 
     // Calculate and update the fluxes in the y-direction
     //
-    #pragma omp for
     for( int i = 1; i < m; ++i )
     {
         calculate_ffy( ffy, i );
@@ -253,68 +250,56 @@ void ShallowWater2D::Solver ()
 
     int steps = std::ceil( tend / dt );
 
-    // @warning The fluxes were made private when compared to the single-thread version.
+    double time = 0;
 
-    double** ffx;  //!< The fluxes in the x- and y-direction
-    double** ffy;
-    double** nFx;
-    double** nFy;
+    // Allocate memory for the fluxes in the x- and y-direction
+    //
+    double** ffx = new double*[ cell_size ];  ffx[0] = new double[ cell_size * m ];
+    double** nFx = new double*[ cell_size ];  nFx[0] = new double[ cell_size * m ];
 
-    #pragma omp parallel private(ffx,ffy,nFx,nFy)
+    double** ffy = new double*[ cell_size ];  ffy[0] = new double[ cell_size * n ];
+    double** nFy = new double*[ cell_size ];  nFy[0] = new double[ cell_size * n ];
+
+    for( int i = 1; i < cell_size; ++i )
     {
-        double time = 0;
-
-        // Allocate memory for the fluxes
-        //
-        ffx = new double*[ cell_size ];  ffx[0] = new double[ cell_size * m ];
-        nFx = new double*[ cell_size ];  nFx[0] = new double[ cell_size * m ];
-
-        ffy = new double*[ cell_size ];  ffy[0] = new double[ cell_size * n ];
-        nFy = new double*[ cell_size ];  nFy[0] = new double[ cell_size * n ];
-
-        for( int i = 1; i < cell_size; ++i )
-        {
-            ffx[i] =  ffx[0] + i * m;    ffy[i] =  ffy[0] + i * n;
-            nFx[i] =  nFx[0] + i * m;    nFy[i] =  nFy[0] + i * n;
-        }
-
-        for( int i = 0; i < steps; ++i, time += dt )
-        {
-            // Apply the boundary conditions
-            //
-            #pragma omp for collapse(2)
-            for( int j = 1; j < n - 1; ++j )
-            {
-                for( int k = 0; k < cell_size; ++k )
-                {
-                    Q( k, 0,   j ) = bc_mask[k] * Q( k, 1, j );
-                    Q( k, m-1, j ) = bc_mask[k] * Q( k, m-2, j);
-                }
-            }
-
-            #pragma omp for collapse(2)
-            for( int j = 0; j < m; ++j )
-            {
-                for( int k = 0; k < cell_size; ++k )
-                {
-                    Q( k, j, 0   ) = bc_mask[k] * Q( k, j, 1   );
-                    Q( k, j, n-1 ) = bc_mask[k] * Q( k, j, n-2 );
-                }
-            }
-
-            // Update all the volumes using the Lax-Friedrich's scheme.
-            //
-            laxf_scheme_2d( ffx, ffy, nFx, nFy );
-        }
-
-        // Free the fluxes
-        //
-        delete[] ffx[0];   delete[] ffx;
-        delete[] nFx[0];   delete[] nFx;
-
-        delete[] ffy[0];   delete[] ffy;
-        delete[] nFy[0];   delete[] nFy;
+        ffx[i] =  ffx[0] + i * m;    ffy[i] =  ffy[0] + i * n;
+        nFx[i] =  nFx[0] + i * m;    nFy[i] =  nFy[0] + i * n;
     }
+
+    for( int i = 0; i < steps; ++i, time += dt )
+    {
+        // Apply the boundary conditions
+        //
+        for( int j = 1; j < n - 1; ++j )
+        {
+            for( int k = 0; k < cell_size; ++k )
+            {
+                Q( k, 0,   j ) = bc_mask[k] * Q( k, 1, j );
+                Q( k, m-1, j ) = bc_mask[k] * Q( k, m-2, j);
+            }
+        }
+
+        for( int j = 0; j < m; ++j )
+        {
+            for( int k = 0; k < cell_size; ++k )
+            {
+                Q( k, j, 0   ) = bc_mask[k] * Q( k, j, 1   );
+                Q( k, j, n-1 ) = bc_mask[k] * Q( k, j, n-2 );
+            }
+        }
+
+        // Update all the volumes using the Lax-Friedrich's scheme.
+        //
+        laxf_scheme_2d( ffx, ffy, nFx, nFy );
+    }
+
+    // Free the fluxes
+    //
+    delete[] ffx[0];   delete[] ffx;
+    delete[] nFx[0];   delete[] nFx;
+
+    delete[] ffy[0];   delete[] ffy;
+    delete[] nFy[0];   delete[] nFy;
 
     double etime = gettime ();
     std::cout << "Solver took " << etime - stime << " seconds" << std::endl;
@@ -381,8 +366,7 @@ void ShallowWater2D::SaveData( const std::string filename )
 */
 int main( int argc, char** argv )
 {
-    // ShallowWater2D shWater( /* m */ 1024, /* n */ 1024, /* tEnd */ 0.1 );
-    ShallowWater2D shWater( /* m */ 512, /* n */ 512, /* tEnd */ 0.1 );
+    ShallowWater2D shWater( /* m */ 1024, /* n */ 1024, /* tEnd */ 0.1 );
 
     shWater.InitialData ();
 

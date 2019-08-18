@@ -11,11 +11,11 @@ endif
 
 OBJS = ${SRC:.c=.o}
 
-SRC = vtk_export.c shwater2d.c
-DEST = shwater2d
-
 SRC = vtk_export.c shwater2d_naive.c
 DEST = shwater2d_naive
+
+SRC = vtk_export.c shwater2d.c
+DEST = shwater2d
 
 all: $(DEST)
 
