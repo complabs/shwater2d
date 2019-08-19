@@ -79,10 +79,12 @@ public:
         // y coordinates
         //
         y = new double[ n ];
-        for( int i = 0; i < n; ++i  ) {
-            y[i] = ystart - dy / 2 + i * dy;
+        for( int j = 0; j < n; ++j  ) {
+            y[j] = ystart - dy / 2 + j * dy;
         }
 
+        std::cout << "Shallow water 2D solver"
+            << ": m = " << m << ", n = " << n << ", tEnd = " << tend << std::endl;
     }
 
     /** Destructs an object (it only frees the allocated memory).
@@ -121,13 +123,10 @@ public:
         {
             for( int j = 1; j < n-1; ++j )
             {
-                Q( 0, i, j )
-                    = height
-                    + eps * exp(
-                             - (   pow2( x[i] - xend / 4.0 )
-                                 + pow2( y[j] - yend / 4.0 )
-                               ) / pow2( delta )
-                          );
+                Q( 0, i, j ) = height
+                    + eps * exp( - (   pow2( x[i] - xend / 4.0 )
+                                     + pow2( y[j] - yend / 4.0 )
+                                   ) / pow2( delta ) );
             }
         }
     }
@@ -136,19 +135,17 @@ public:
      */
     void Validate ()
     {
-        for( int i = 0; i < n; ++i )
+        for( int i = 0; i < m; ++i )
         {
-            for( int j = 0; j < m; ++j )
+            for( int j = 0; j < n; ++j )
             {
                 for( int k = 0; k < cell_size; ++k )
                 {
-                    if( ! std::isfinite( Q( k, j, i ) ) )
+                    if( ! std::isfinite( Q( k, i, j ) ) )
                     {
-                        {
-                            std::cerr << std::endl << "Invalid solution!" 
-                                << std::endl << std::endl;
-                            exit( -1 );
-                        }
+                        std::cerr << std::endl << "Invalid solution!" 
+                            << std::endl << std::endl;
+                        exit( -1 );
                     }
                 }
             }
@@ -165,13 +162,38 @@ public:
 
 private:
 
-    /** The Lax-Friedrich's scheme for updating volumes.
+    /** Updates the boundary conditions.
      */
-    void laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy );
+    void update_bc ()
+    {
+        // Mask for the reflective boundary conditions
+        //
+        const double bc_mask[3] = { 1.0, -1.0, -1.0 }; 
+
+        #pragma omp for collapse(2)
+        for( int j = 1; j < n - 1; ++j )
+        {
+            for( int k = 0; k < cell_size; ++k )
+            {
+                Q( k, 0,   j ) = bc_mask[k] * Q( k, 1, j );
+                Q( k, m-1, j ) = bc_mask[k] * Q( k, m-2, j );
+            }
+        }
+
+        #pragma omp for collapse(2)
+        for( int j = 0; j < m; ++j )
+        {
+            for( int k = 0; k < cell_size; ++k )
+            {
+                Q( k, j, 0   ) = bc_mask[k] * Q( k, j, 1   );
+                Q( k, j, n-1 ) = bc_mask[k] * Q( k, j, n-2 );
+            }
+        }
+    }
 
     /** Calculates the flux function in the x-direction.
      */
-    inline void calculate_ffx( double** ffx, int j )
+    void calculate_ffx( double** ffx, int j )
     {
         for( int i = 0; i < m; ++i )
         {
@@ -186,7 +208,7 @@ private:
 
     /** Calculates the flux function in the y-direction.
      */
-    inline void calculate_ffy( double** ffy, int i )
+    void calculate_ffy( double** ffy, int i )
     {
         for( int j = 0; j < n; ++j )
         {
@@ -198,32 +220,35 @@ private:
                         + g * pow2( Q(0, i, j) ) / 2.0;
         }
     }
+
+    /** The Lax-Friedrich's scheme for updating volumes.
+     */
+    void laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy );
 };
 
 /** This is the Lax-Friedrich's scheme for updating volumes
- *  Try to parallelize it in an efficient way!
  */
 void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy )
 {
     // Calculate and update the fluxes in the x-direction
     //
     #pragma omp for
-    for( int i = 1; i < n; ++i )
+    for( int j = 1; j < n; ++j )
     {
-        calculate_ffx( ffx, i ); // calculates ffx from Q
+        calculate_ffx( ffx, j ); // calculates ffx from Q
 
-        for( int j = 1; j < m; ++j ) 
+        for( int i = 1; i < m; ++i ) 
         {
             for( int k = 0; k < cell_size; ++k ) {
-                nFx[k][j] = 0.5 * ( ( ffx[k][j-1] + ffx[k][j] ) 
-                                   - dx/dt * ( Q(k, j, i) - Q(k, j-1, i) ) );
+                nFx[k][i] = 0.5 * ( ( ffx[k][i-1] + ffx[k][i] ) 
+                                   - dx/dt * ( Q(k, i, j) - Q(k, i-1, j) ) );
             }
         }
 
-        for( int j = 1; j < m-1; ++j ) 
+        for( int i = 1; i < m-1; ++i ) 
         {
             for( int k = 0; k < cell_size; ++k ) {
-                Q(k, j, i) = Q(k, j, i) - dt/dx * ( nFx[k][j+1] - nFx[k][j] );
+                Q(k, i, j) = Q(k, i, j) - dt/dx * ( nFx[k][i+1] - nFx[k][i] );
             }
         }
     }
@@ -259,31 +284,22 @@ void ShallowWater2D::Solver ()
 {
     double stime = gettime ();
 
-    double bc_mask[3] = { 1.0, -1.0, -1.0 }; // Boundary condition mask
-
     int steps = std::ceil( tend / dt );
 
-    #pragma omp parallel // private(ffx,ffy,nFx,nFy)
+    #pragma omp parallel
     {
-    double** ffx;  //!< The fluxes in the x- and y-direction
-    double** ffy;
-    double** nFx;
-    double** nFy;
-
         #pragma omp master
-        std::cout << "Started solver"
-            << ", m = " << m << ", n = " << n << ", tEnd = " << tend
-            << ", num_threads = " << omp_get_num_threads () << std::endl;
+        std::cout << "Running; num_threads = " << omp_get_num_threads () << std::endl;
 
         double time = 0;
 
-        // Allocate memory for the fluxes
+        // Allocate memory for the fluxes in the x- and y-direction
         //
-        ffx = new double*[ cell_size ];    ffx[0] = new double[ cell_size * m ];
-        nFx = new double*[ cell_size ];    nFx[0] = new double[ cell_size * m ];
+        double** ffx = new double*[ cell_size ];    ffx[0] = new double[ cell_size * m ];
+        double** nFx = new double*[ cell_size ];    nFx[0] = new double[ cell_size * m ];
 
-        ffy = new double*[ cell_size ];    ffy[0] = new double[ cell_size * n ];
-        nFy = new double*[ cell_size ];    nFy[0] = new double[ cell_size * n ];
+        double** ffy = new double*[ cell_size ];    ffy[0] = new double[ cell_size * n ];
+        double** nFy = new double*[ cell_size ];    nFy[0] = new double[ cell_size * n ];
 
         for( int k = 1; k < cell_size; ++k )
         {
@@ -291,32 +307,12 @@ void ShallowWater2D::Solver ()
             nFx[k] =  nFx[0] + k * m;      nFy[k] =  nFy[0] + k * n;
         }
 
+        // Apply the boundary conditions then 
+        // update all the volumes using the Lax-Friedrich's scheme.
+        //
         for( int i = 0; i < steps; ++i, time += dt )
         {
-            // Apply the boundary conditions
-            //
-            #pragma omp for collapse(2)
-            for( int j = 1; j < n - 1; ++j )
-            {
-                for( int k = 0; k < cell_size; ++k )
-                {
-                    Q( k, 0,   j ) = bc_mask[k] * Q( k, 1, j );
-                    Q( k, m-1, j ) = bc_mask[k] * Q( k, m-2, j );
-                }
-            }
-
-            #pragma omp for collapse(2)
-            for( int j = 0; j < m; ++j )
-            {
-                for( int k = 0; k < cell_size; ++k )
-                {
-                    Q( k, j, 0   ) = bc_mask[k] * Q( k, j, 1   );
-                    Q( k, j, n-1 ) = bc_mask[k] * Q( k, j, n-2 );
-                }
-            }
-
-            // Update all the volumes using the Lax-Friedrich's scheme.
-            //
+            update_bc ();
             laxf_scheme_2d( ffx, ffy, nFx, nFy );
         }
 
@@ -337,7 +333,7 @@ void ShallowWater2D::SaveData( const std::string filename )
 {
     FILE *fp = fopen( filename.c_str(), "w" );
 
-    // Write vtk Datafile header
+    // Write the vtk-file header
     //
     fprintf( fp, "# vtk DataFile Version 2.0\n"
                  "VTK\n"
@@ -394,11 +390,11 @@ void ShallowWater2D::SaveData( const std::string filename )
 */
 int main( int argc, char** argv )
 {
-    int    nThreads = argc >= 2 ? atoi  ( argv[1] )       : -1   ;
-    int    mSize    = argc >= 3 ? atoi  ( argv[2] )       : 1024 ;
-    int    nSize    = argc >= 4 ? atoi  ( argv[3] )       : 1024 ;
-    double tEnd     = argc >= 5 ? strtod( argv[4], NULL ) : 0.1  ;
-    int    useVTK   = argc >= 6 ? atoi  ( argv[5] )       : 0    ;
+    int    nThreads = argc >= 2 ? atoi   ( argv[1]       ) : -1   ;
+    int    mSize    = argc >= 3 ? atoi   ( argv[2]       ) : 1024 ;
+    int    nSize    = argc >= 4 ? atoi   ( argv[3]       ) : 1024 ;
+    double tEnd     = argc >= 5 ? strtod ( argv[4], NULL ) : 0.1  ;
+    int    useVTK   = argc >= 6 ? atoi   ( argv[5]       ) : 0    ;
 
     if( nThreads > 0 ) {
         omp_set_num_threads( nThreads );
