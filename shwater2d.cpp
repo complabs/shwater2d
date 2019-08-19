@@ -263,13 +263,18 @@ void ShallowWater2D::Solver ()
 
     int steps = std::ceil( tend / dt );
 
+    #pragma omp parallel // private(ffx,ffy,nFx,nFy)
+    {
     double** ffx;  //!< The fluxes in the x- and y-direction
     double** ffy;
     double** nFx;
     double** nFy;
 
-    #pragma omp parallel private(ffx,ffy,nFx,nFy)
-    {
+        #pragma omp master
+        std::cout << "Started solver"
+            << ", m = " << m << ", n = " << n << ", tEnd = " << tend
+            << ", num_threads = " << omp_get_num_threads () << std::endl;
+
         double time = 0;
 
         // Allocate memory for the fluxes
@@ -315,7 +320,7 @@ void ShallowWater2D::Solver ()
             laxf_scheme_2d( ffx, ffy, nFx, nFy );
         }
 
-        // Free the fluxes
+        // Free the memory reserved for the fluxes
         //
         delete[] ffx[0];   delete[] ffx;
         delete[] nFx[0];   delete[] nFx;
@@ -389,7 +394,17 @@ void ShallowWater2D::SaveData( const std::string filename )
 */
 int main( int argc, char** argv )
 {
-    ShallowWater2D shWater( /* m */ 1024, /* n */ 1024, /* tEnd */ 0.1 );
+    int    nThreads = argc >= 2 ? atoi  ( argv[1] )       : -1   ;
+    int    mSize    = argc >= 3 ? atoi  ( argv[2] )       : 1024 ;
+    int    nSize    = argc >= 4 ? atoi  ( argv[3] )       : 1024 ;
+    double tEnd     = argc >= 5 ? strtod( argv[4], NULL ) : 0.1  ;
+    int    useVTK   = argc >= 6 ? atoi  ( argv[5] )       : 0    ;
+
+    if( nThreads > 0 ) {
+        omp_set_num_threads( nThreads );
+    }
+
+    ShallowWater2D shWater( mSize, nSize, tEnd );
 
     shWater.InitialData ();
 
@@ -397,11 +412,9 @@ int main( int argc, char** argv )
 
     shWater.Validate ();
 
-    // Use -DEXPORT_VTK if you want visualize the result in ParaView.
-    //
-    #ifdef EXPORT_VTK
+    if( useVTK ) {
         shWater.SaveData ();
-    #endif
+    }
 
     return 0;
 }
