@@ -1,5 +1,9 @@
 # OpenMP Advanced project
 
+This is a C++ implementation of:
+
+https://github.com/PDC-support/openmp-lab-exercises/tree/master/advanced_lab
+
 ## About this exercise
 
 The aim of this exercise is to give hands-on experience in parallelizing a
