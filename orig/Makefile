@@ -26,7 +26,7 @@ $(DEST2): $(OBJS2)
 	$(CC) $(CFLAGS) $(OBJS2) -o $@ -lm	
 
 clean:
-	rm -f $(DEST) $(DEST2) *.o
+	rm -f $(DEST) $(DEST2) *.o *.vtk
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
