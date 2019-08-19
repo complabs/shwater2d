@@ -218,7 +218,7 @@ private:
 
     /** Updates the boundary conditions.
      */
-    void update_bc ()
+    void apply_boundary_conditions ()
     {
         // Mask for the reflective boundary conditions
         //
@@ -446,7 +446,7 @@ void ShallowWater2D::Solver ()
         double time = 0;
         for( int i = 0; i < steps; ++i, time += dt )
         {
-            update_bc ();
+            apply_boundary_conditions ();
             laxf_scheme_2d( ffx, ffy, nFx, nFy );
         }
 
