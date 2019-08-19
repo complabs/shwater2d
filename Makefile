@@ -1,16 +1,15 @@
 CXX = g++
-CXXFLAGS = -O2 -fopenmp
-CPPFLAGS = -DEXPORT_VTK
+CXXFLAGS = -std=c++14 -Wall -O2 -fopenmp
 
 ifeq ($(CRAY_PRGENVCRAY), loaded)
 CXX = CC
-CXXFLAGS = -O2 -openmp
+CXXFLAGS = -std=c++14 -Wall -O2 -openmp
 else ifeq ($(CRAY_PRGENVINTEL), loaded)
 CXX = CC
-CXXFLAGS = -O2 -openmp -D_Float128=__float128
+CXXFLAGS = -std=c++14 -Wall -O2 -openmp -D_Float128=__float128
 else ifeq ($(CRAY_PRGENVGNU), loaded)
 CXX = CC
-CXXFLAGS = -O2 -fopenmp
+CXXFLAGS = -std=c++14 -Wall -O2 -fopenmp
 endif
 
 OBJS = ${SRC:.cpp=.o}
@@ -28,5 +27,5 @@ clean:
 	rm -f bin obj *.vtk
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) -c $<
 
