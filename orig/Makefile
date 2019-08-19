@@ -9,21 +9,24 @@ else ifeq ($(CRAY_PRGENVGNU), loaded)
 CFLAGS = -O2 -fopenmp
 endif
 
-OBJS = ${SRC:.c=.o}
-
 SRC = vtk_export.c shwater2d.c
 DEST = shwater2d
+OBJS = ${SRC:.c=.o}
 
-SRC = vtk_export.c shwater2d_naive.c
-DEST = shwater2d_naive
+SRC2 = vtk_export.c shwater2d_naive.c
+DEST2 = shwater2d_naive
+OBJS2= ${SRC2:.c=.o}
 
-all: $(DEST)
+all: $(DEST) $(DEST2)
 
 $(DEST): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ -lm	
 
+$(DEST2): $(OBJS2)
+	$(CC) $(CFLAGS) $(OBJS2) -o $@ -lm	
+
 clean:
-	rm -f $(DEST) *.o
+	rm -f $(DEST) $(DEST2) *.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
