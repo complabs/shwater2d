@@ -226,7 +226,60 @@ private:
     void laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy );
 };
 
-/** This is the Lax-Friedrich's scheme for updating volumes
+/** Saves the result in the vtk fileformat.
+ */
+void ShallowWater2D::SaveData( const std::string filename )
+{
+    FILE *fp = fopen( filename.c_str(), "w" );
+
+    // Write the vtk-file header
+    //
+    fprintf( fp, "# vtk DataFile Version 2.0\n"
+                 "VTK\n"
+                 "ASCII\n"
+                 "DATASET POLYDATA\n" );
+
+    // Store the water height as polydata
+    //
+    fprintf( fp, "\nPOINTS %d double\n", m * n );
+
+    for( int j = 0; j < n; ++j )
+    {
+        for( int i = 0; i < m; ++i ) {
+            fprintf( fp, "%e %e %e\n", x[i], y[j], Q(0, i, j) );
+        }
+    }
+
+    fprintf( fp, "\nVERTICES %d %d\n", n, n * ( m + 1 ) );
+
+    for( int j = 0; j < n; ++j )
+    {
+        fprintf(fp, "%d ", m);
+
+        for( int i = 0; i < m; ++i ) {
+            fprintf( fp, "%d ", i + j * m );
+        }
+
+        fprintf( fp, "\n" );
+    }
+
+    // Store the lookup table
+    //
+    fprintf( fp,
+        "POINT_DATA %d\n"
+        "SCALARS height double 1\n"
+        "LOOKUP_TABLE default\n", m * n);
+
+    for( int j = 0; j < n; ++j )
+    {
+        for( int i = 0; i < m; ++i ) {
+            fprintf( fp, "%e\n", Q( 0, i, j ) );
+        }
+    }
+    fclose( fp );
+}
+
+/** Uses the Lax-Friedrich's scheme for updating the volumes.
  */
 void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy )
 {
@@ -239,7 +292,8 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
 
         for( int i = 1; i < m; ++i ) 
         {
-            for( int k = 0; k < cell_size; ++k ) {
+            for( int k = 0; k < cell_size; ++k ) 
+            {
                 nFx[k][i] = 0.5 * ( ( ffx[k][i-1] + ffx[k][i] ) 
                                    - dx/dt * ( Q(k, i, j) - Q(k, i-1, j) ) );
             }
@@ -247,7 +301,8 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
 
         for( int i = 1; i < m-1; ++i ) 
         {
-            for( int k = 0; k < cell_size; ++k ) {
+            for( int k = 0; k < cell_size; ++k ) 
+            {
                 Q(k, i, j) = Q(k, i, j) - dt/dx * ( nFx[k][i+1] - nFx[k][i] );
             }
         }
@@ -262,7 +317,8 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
 
         for( int j = 1; j < n; ++j ) 
         {
-            for( int k = 0; k < cell_size; ++k ) {
+            for( int k = 0; k < cell_size; ++k ) 
+            {
                 nFy[k][j] = 0.5 * ( ( ffy[k][j-1] + ffy[k][j] ) 
                                    - dy/dt * ( Q(k, i, j) - Q(k, i, j-1) ) );
             }
@@ -270,7 +326,8 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
 
         for( int j = 1; j <  n-1; ++j ) 
         {
-            for( int k = 0; k < cell_size; ++k ) {
+            for( int k = 0; k < cell_size; ++k ) 
+            {
                 Q(k,i,j) = Q(k,i,j) - dt/dy * ( nFy[k][j+1] - nFy[k][j] );
             }
         }
@@ -327,57 +384,6 @@ void ShallowWater2D::Solver ()
 
     double etime = gettime ();
     std::cout << "Solver took " << etime - stime << " seconds" << std::endl;
-}
-
-void ShallowWater2D::SaveData( const std::string filename )
-{
-    FILE *fp = fopen( filename.c_str(), "w" );
-
-    // Write the vtk-file header
-    //
-    fprintf( fp, "# vtk DataFile Version 2.0\n"
-                 "VTK\n"
-                 "ASCII\n"
-                 "DATASET POLYDATA\n" );
-
-    // Store the water height as polydata
-    //
-    fprintf( fp, "\nPOINTS %d double\n", m * n );
-
-    for( int j = 0; j < n; ++j )
-    {
-        for( int i = 0; i < m; ++i ) {
-            fprintf( fp, "%e %e %e\n", x[i], y[j], Q(0, i, j) );
-        }
-    }
-
-    fprintf( fp, "\nVERTICES %d %d\n", n, n * ( m + 1 ) );
-
-    for( int j = 0; j < n; ++j )
-    {
-        fprintf(fp, "%d ", m);
-
-        for( int i = 0; i < m; ++i ) {
-            fprintf( fp, "%d ", i + j * m );
-        }
-
-        fprintf( fp, "\n" );
-    }
-
-    // Store the lookup table
-    //
-    fprintf( fp,
-        "POINT_DATA %d\n"
-        "SCALARS height double 1\n"
-        "LOOKUP_TABLE default\n", m * n);
-
-    for( int j = 0; j < n; ++j )
-    {
-        for( int i = 0; i < m; ++i ) {
-            fprintf( fp, "%e\n", Q( 0, i, j ) );
-        }
-    }
-    fclose( fp );
 }
 
 /** This is the main routine of the program, which allocates memory
