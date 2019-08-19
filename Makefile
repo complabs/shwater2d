@@ -29,3 +29,6 @@ clean:
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $<
 
+test: shwater2d
+	./shwater2d 0 1024 1024 0.1 1
+	diff result.vtk orig/result.vtk

@@ -5,51 +5,74 @@
 #include <sys/time.h>  // used by gettime
 #include <omp.h>
 
+namespace GF
+{
+    /** The grid functions (which name cells at a gridpoint).
+     */
+    enum GridFunctions
+    { 
+        h = 0,  //!< Water depth
+        u,      //!< x-velocity
+        v,      //!< y-velocity
+        count   //!< Number of grid functions at a gridpoint
+    };
+}
+
 /** class ShallowWater2D
  *  enacapsulates a solver for the two dimensional shallow water equations
  *  using the Lax-Friedrich's scheme.
  */
 class ShallowWater2D
 {
-    const double g      = 9.81;  //!< Standard acceleration of the Earth
+    ///////////////////////////////////////////////////////////////////////////
+    // The constants
+    ///////////////////////////////////////////////////////////////////////////
 
-    int m;  //!< Use m volumes in the x-direction
-    int n;  //!< Use n volumes in the y-direction
+    const double g = 9.81;  //!< The acceleration due to gravity 
 
-    double tend;  //!< The end time of the integration
+    ///////////////////////////////////////////////////////////////////////////
+    // The grid
+    ///////////////////////////////////////////////////////////////////////////
 
-    double dx;  //!< The distance between two volumes in the x-direction
-    double dy;  //!< The distance between two volumes in the y-direction
-    double dt;  //!< The time step
+    int m;  //!< Number of volumes (grid points) in the x-direction
+    int n;  //!< Number of volumes (grid points) in the y-direction
 
-    double* grid;  //!< The data grid (with the water height)
-    double* x;     //!< The x-coordinates of the domain, len = `m`
-    double* y;     //!< The y coordinates of the domain, len = `n`
+    double* grid;  //!< The data grid
 
-    const int ncells = 3;  //!< Numer of cells at a gridpoint
+    double* x;  //!< The x-coordinates of the domain, dim = `m`
+    double* y;  //!< The y coordinates of the domain, dim = `n`
 
-    /** Q(cell,i,j) accesses the gridpoint data.
-     *
-     *  The cells are: 0 = water depth, 1 = x-velocity, 2 = y-velocity.
+    // The grid functions
+    //
+    inline double& Qh( int i, int j ) { return Q( GF::h, i, j ); }
+    inline double& Qu( int i, int j ) { return Q( GF::u, i, j ); }
+    inline double& Qv( int i, int j ) { return Q( GF::v, i, j ); }
+
+    /** Q(gf,i,j), a generic grid function at the gridpoint (i,j).
      *
      *  @warning The structure of the multidimensional grid array affects 
      *           the optimization and the for-loop performance.
      */
-    inline double& Q( int cell, int i, int j )
+    inline double& Q( int gf, int i, int j )
     {
-        return grid[ ( i * n + j ) * ncells + cell ];     // Fast
-        // return grid[ ( j * m + i ) * ncells + cell ];  // Fast
-        // return grid[ ( cell * m + i ) * n + j ];       // Slow
+        return grid[ ( i * n + j ) * GF::count + gf ];     // Fast
+        // return grid[ ( j * m + i ) * GF::count + gf ];  // Fast
+        // return grid[ ( gf * m + i ) * n + j ];          // Slow
     }
 
-    /** Returns the current time in seconds with a microsecond resolution.
-     */
-    static inline double gettime( void )
-    {
-        struct timeval tv;
-        gettimeofday( &tv, NULL );
-        return tv.tv_sec + 1e-6 * tv.tv_usec;
-    }
+    ///////////////////////////////////////////////////////////////////////////
+    // The integration variabls
+    ///////////////////////////////////////////////////////////////////////////
+
+    double tend;  //!< The integration end time
+
+    double dx;    //!< The distance between two volumes in the x-direction
+    double dy;    //!< The distance between two volumes in the y-direction
+    double dt;    //!< The time step
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Public methods
+    ///////////////////////////////////////////////////////////////////////////
 
 public:
 
@@ -58,18 +81,18 @@ public:
      */
     ShallowWater2D
     ( 
-        int    mSize  = 1024,  //!< Use m volumes in the x-direction
-        int    nSize  = 1024,  //!< Use n volumes in the y-direction
-        double tEnd   = 0.1,   //!< The end time (of integration)
-        double xstart = 0.0,   //!< The domain starts here in the x-direction
-        double xend   = 4.0,   //!< The domain ends here in the x-direction
-        double ystart = 0.0,   //!< THe domain starts here in the y-direction
-        double yend   = 4.0    //!< The domain ends here in the y-direction
+        int    mSize  = 1024,  //!< Use m volumes (grid points) in the x-direction
+        int    nSize  = 1024,  //!< Use n volumes (grid points) in the y-direction
+        double tEnd   = 0.1,   //!< The integration end time
+        double xstart = 0.0,   //!< The domain starts here along the x-direction
+        double xend   = 4.0,   //!< The domain ends here along the x-direction
+        double ystart = 0.0,   //!< The domain starts here along the y-direction
+        double yend   = 4.0    //!< The domain ends here along the y-direction
     )   
         : m( mSize ), n( nSize ), tend( tEnd )
     {
-        dx = ( xend - xstart ) / m;  // Distance between two volumes (x-direction)
-        dy = ( yend - ystart ) / n;  // Distance between two volumes (y-direction)
+        dx = ( xend - xstart ) / m;  // Grid spacing in the x-direction
+        dy = ( yend - ystart ) / n;  // Grid spacing in the y-direction
         dt = dx / sqrt( g * 5.0 );   // Time step
 
         // Add two ghost volumes at each side of the domain
@@ -79,7 +102,7 @@ public:
 
         // Allocate memory for the domain
         //
-        grid = new double[ m * n * ncells ];
+        grid = new double[ m * n * GF::count ];
 
         // x coordinates
         //
@@ -108,10 +131,6 @@ public:
         delete[] y;
     }
 
-    /** Square of a number.
-     */
-    static inline double pow2( const double& x ) { return x * x; }
-
     /** Constructs a Gauss hump as the initial data.
      */
     void InitialData
@@ -130,9 +149,9 @@ public:
             {
                 for( int j = 0; j < n; ++j )
                 {
-                    Q( 0, i, j ) = height;
-                    Q( 1, i, j ) = 0.0;
-                    Q( 2, i, j ) = 0.0;
+                    Qh( i, j ) = height;
+                    Qu( i, j ) = 0.0;
+                    Qv( i, j ) = 0.0;
                 }
             }
 
@@ -141,10 +160,10 @@ public:
             {
                 for( int j = 1; j < n - 1; ++j )
                 {
-                    Q( 0, i, j ) = height
-                        + eps * exp( - (   pow2( x[i] - xpos )
-                                         + pow2( y[j] - ypos )
-                                       ) / pow2( delta ) );
+                    Qh( i, j ) = height
+                        + eps * exp( - (   SQR( x[i] - xpos )
+                                         + SQR( y[j] - ypos )
+                                       ) / SQR( delta ) );
                 }
             }
         }
@@ -158,9 +177,9 @@ public:
         {
             for( int j = 0; j < n; ++j )
             {
-                for( int cell = 0; cell < ncells; ++cell )
+                for( int gf = 0; gf < GF::count; ++gf )
                 {
-                    if( ! std::isfinite( Q( cell, i, j ) ) )
+                    if( ! std::isfinite( Q( gf, i, j ) ) )
                     {
                         std::cerr << "Data validation failed." << std::endl;
                         exit( -1 );
@@ -178,7 +197,24 @@ public:
      */
     void Solver ();
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Private methods
+    ///////////////////////////////////////////////////////////////////////////
+
 private:
+
+    /** Square of a number.
+     */
+    static inline double SQR( const double& x ) { return x * x; }
+
+    /** Returns the current time in seconds with a microsecond resolution.
+     */
+    static inline double gettime( void )
+    {
+        struct timeval tv;
+        gettimeofday( &tv, NULL );
+        return tv.tv_sec + 1e-6 * tv.tv_usec;
+    }
 
     /** Updates the boundary conditions.
      */
@@ -186,25 +222,25 @@ private:
     {
         // Mask for the reflective boundary conditions
         //
-        const double bc_mask[ ncells ] = { 1.0, -1.0, -1.0 }; 
+        const double bc_mask[ GF::count ] = { 1.0, -1.0, -1.0 }; 
 
         #pragma omp for collapse(2)
         for( int j = 1; j < n - 1; ++j )
         {
-            for( int cell = 0; cell < ncells; ++cell )
+            for( int gf = 0; gf < GF::count; ++gf )
             {
-                Q( cell, 0,   j ) = bc_mask[cell] * Q( cell, 1,   j );
-                Q( cell, m-1, j ) = bc_mask[cell] * Q( cell, m-2, j );
+                Q( gf, 0,   j ) = bc_mask[gf] * Q( gf, 1,   j );
+                Q( gf, m-1, j ) = bc_mask[gf] * Q( gf, m-2, j );
             }
         }
 
         #pragma omp for collapse(2)
         for( int j = 0; j < m; ++j )
         {
-            for( int cell = 0; cell < ncells; ++cell )
+            for( int gf = 0; gf < GF::count; ++gf )
             {
-                Q( cell, j, 0   ) = bc_mask[cell] * Q( cell, j, 1   );
-                Q( cell, j, n-1 ) = bc_mask[cell] * Q( cell, j, n-2 );
+                Q( gf, j, 0   ) = bc_mask[gf] * Q( gf, j, 1   );
+                Q( gf, j, n-1 ) = bc_mask[gf] * Q( gf, j, n-2 );
             }
         }
     }
@@ -215,12 +251,12 @@ private:
     {
         for( int i = 0; i < m; ++i )
         {
-            ffx[0][i] = Q(1, i, j);
+            ffx[GF::h][i] = Qu( i, j );
 
-            ffx[1][i] = pow2( Q(1, i, j) ) / Q(0, i, j)
-                        + g * pow2( Q(0, i, j) ) / 2.0;
+            ffx[GF::u][i] = Qu( i, j ) * Qu( i, j ) / Qh( i, j )
+                            + g * SQR( Qh(i, j ) ) / 2.0;
 
-            ffx[2][i] = Q(1, i, j) * Q(2, i, j) / Q(0, i, j);
+            ffx[GF::v][i] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
         }
     }
 
@@ -230,12 +266,12 @@ private:
     {
         for( int j = 0; j < n; ++j )
         {
-            ffy[0][j] = Q(2, i, j);
+            ffy[GF::h][j] = Qv( i, j );
 
-            ffy[1][j] = Q(1, i, j) * Q(2, i, j) / Q(0, i, j);
+            ffy[GF::u][j] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
 
-            ffy[2][j] = pow2( Q(2, i, j) ) / Q(0, i, j) 
-                        + g * pow2( Q(0, i, j) ) / 2.0;
+            ffy[GF::v][j] = Qv( i, j ) * Qv( i, j ) / Qh( i, j ) 
+                            + g * SQR( Qh( i, j ) ) / 2.0;
         }
     }
 
@@ -268,7 +304,7 @@ void ShallowWater2D::SaveData( const std::string filename )
     for( int j = 0; j < n; ++j )
     {
         for( int i = 0; i < m; ++i ) {
-            fprintf( fp, "%e %e %e\n", x[i], y[j], Q(0, i, j) );
+            fprintf( fp, "%e %e %e\n", x[i], y[j], Qh( i, j ) );
         }
     }
 
@@ -295,7 +331,7 @@ void ShallowWater2D::SaveData( const std::string filename )
     for( int j = 0; j < n; ++j )
     {
         for( int i = 0; i < m; ++i ) {
-            fprintf( fp, "%e\n", Q( 0, i, j ) );
+            fprintf( fp, "%e\n", Qh( i, j ) );
         }
     }
 
@@ -308,52 +344,63 @@ void ShallowWater2D::SaveData( const std::string filename )
  */
 void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy )
 {
-    // Calculate and update the fluxes in the x-direction
+    const double dx_over_dt = dx/dt, dy_over_dt = dy/dt, 
+                 dt_over_dx = dt/dx, dt_over_dy = dt/dy;
+
+    // Loop along the y-direction
     //
     #pragma omp for
     for( int j = 1; j < n; ++j )
     {
         calculate_ffx( ffx, j ); // calculates ffx from Q
 
+        // Update the fluxes in the x-direction
+        //
         for( int i = 1; i < m; ++i ) 
         {
-            for( int cell = 0; cell < ncells; ++cell ) 
+            for( int gf = 0; gf < GF::count; ++gf ) 
             {
-                nFx[cell][i] = 0.5 * ( ( ffx[cell][i-1] + ffx[cell][i] ) 
-                                   - dx/dt * ( Q(cell, i, j) - Q(cell, i-1, j) ) );
+                nFx[gf][i] = 0.5 * ( ( ffx[gf][i-1] + ffx[gf][i] ) 
+                             - dx_over_dt * ( Q(gf, i, j) - Q(gf, i-1, j) ) );
             }
         }
 
+        // Update the volume Q with the fluxes
+        //
         for( int i = 1; i < m-1; ++i ) 
         {
-            for( int cell = 0; cell < ncells; ++cell ) 
+            for( int gf = 0; gf < GF::count; ++gf ) 
             {
-                Q(cell, i, j) = Q(cell, i, j) - dt/dx * ( nFx[cell][i+1] - nFx[cell][i] );
+                Q(gf,i,j) -= dt_over_dx * ( nFx[gf][i+1] - nFx[gf][i] );
             }
         }
     }
 
-    // Calculate and update the fluxes in the y-direction
+    // Loop along the x-direction
     //
     #pragma omp for
     for( int i = 1; i < m; ++i )
     {
         calculate_ffy( ffy, i ); // calculates ffy from Q
 
+        // Update the fluxes in the y-direction
+        //
         for( int j = 1; j < n; ++j ) 
         {
-            for( int cell = 0; cell < ncells; ++cell ) 
+            for( int gf = 0; gf < GF::count; ++gf ) 
             {
-                nFy[cell][j] = 0.5 * ( ( ffy[cell][j-1] + ffy[cell][j] ) 
-                                   - dy/dt * ( Q(cell, i, j) - Q(cell, i, j-1) ) );
+                nFy[gf][j] = 0.5 * ( ( ffy[gf][j-1] + ffy[gf][j] ) 
+                             - dy_over_dt * ( Q(gf, i, j) - Q(gf, i, j-1) ) );
             }
         }
 
+        // Update the volume Q with the fluxes
+        //
         for( int j = 1; j < n - 1; ++j ) 
         {
-            for( int cell = 0; cell < ncells; ++cell ) 
+            for( int gf = 0; gf < GF::count; ++gf ) 
             {
-                Q(cell,i,j) = Q(cell,i,j) - dt/dy * ( nFy[cell][j+1] - nFy[cell][j] );
+                Q(gf,i,j) -= dt_over_dy * ( nFy[gf][j+1] - nFy[gf][j] );
             }
         }
     }
@@ -375,22 +422,22 @@ void ShallowWater2D::Solver ()
 
         // Allocate memory for the fluxes in the x- and y-direction
         //
-        double** ffx = new double*[ ncells ];
-        double** nFx = new double*[ ncells ];
-        double** ffy = new double*[ ncells ];
-        double** nFy = new double*[ ncells ];
+        double** ffx = new double*[ GF::count ];
+        double** nFx = new double*[ GF::count ];
+        double** ffy = new double*[ GF::count ];
+        double** nFy = new double*[ GF::count ];
 
-        ffx[0] = new double[ ncells * m ];
-        nFx[0] = new double[ ncells * m ];
-        ffy[0] = new double[ ncells * n ];
-        nFy[0] = new double[ ncells * n ];
+        ffx[0] = new double[ GF::count * m ];
+        nFx[0] = new double[ GF::count * m ];
+        ffy[0] = new double[ GF::count * n ];
+        nFy[0] = new double[ GF::count * n ];
 
-        for( int cell = 1; cell < ncells; ++cell )
+        for( int gf = 1; gf < GF::count; ++gf )
         {
-            ffx[cell] = ffx[0] + cell * m;
-            nFx[cell] = nFx[0] + cell * m;
-            ffy[cell] = ffy[0] + cell * n;
-            nFy[cell] = nFy[0] + cell * n;
+            ffx[gf] = ffx[0] + gf * m;
+            nFx[gf] = nFx[0] + gf * m;
+            ffy[gf] = ffy[0] + gf * n;
+            nFy[gf] = nFy[0] + gf * n;
         }
 
         // Apply the boundary conditions then 
