@@ -1,8 +1,22 @@
 #include <iostream>
-#include <cmath> // isfinite()
 #include <string>
-#include <sys/time.h>
+#include <cmath>       // needs isfinite()
+#include <cstdio>      // used by SaveData
+#include <sys/time.h>  // used by gettime
 #include <omp.h>
+
+namespace GF
+{
+    /** The grid functions (which name cells at a gridpoint).
+     */
+    enum GridFunctions
+    { 
+        h = 0,  //!< Water depth
+        u,      //!< x-velocity
+        v,      //!< y-velocity
+        count   //!< Number of grid functions at a gridpoint
+    };
+}
 
 /** class ShallowWater2D
  *  enacapsulates a solver for the two dimensional shallow water equations
@@ -10,56 +24,75 @@
  */
 class ShallowWater2D
 {
-    const double g      = 9.81;  //!< Standard acceleration of the Earth
+    ///////////////////////////////////////////////////////////////////////////
+    // The constants
+    ///////////////////////////////////////////////////////////////////////////
 
-    const double xstart = 0.0;   //!< The domain starts here in the x-direction
-    const double xend   = 4.0;   //!< The domain ends here in the x-direction
+    const double g = 9.81;  //!< The acceleration due to gravity 
 
-    const double ystart = 0.0;   //!< THe domain starts here in the y-direction
-    const double yend   = 4.0;   //!< The domain ends here in the y-direction
+    ///////////////////////////////////////////////////////////////////////////
+    // The grid
+    ///////////////////////////////////////////////////////////////////////////
 
-    int m;  //!< Use m volumes in the x-direction
-    int n;  //!< Use n volumes in the y-direction
+    int m;  //!< Number of volumes (grid points) in the x-direction
+    int n;  //!< Number of volumes (grid points) in the y-direction
 
-    double tend;  //!< The end time of the integration
+    double* grid;  //!< The data grid
 
-    double dx;  //!< The distance between two volumes in the x-direction
-    double dy;  //!< The distance between two volumes in the y-direction
-    double dt;  //!< The time step
+    double* x;  //!< The x-coordinates of the domain, dim = `m`
+    double* y;  //!< The y coordinates of the domain, dim = `n`
 
-    double* grid;  //!< The data grid (with the water height)
-    double* x;     //!< The x-coordinates of the domain
-    double* y;     //!< The y coordinates of the domain
+    // The grid functions
+    //
+    inline double& Qh( int i, int j ) { return Q( GF::h, i, j ); }
+    inline double& Qu( int i, int j ) { return Q( GF::u, i, j ); }
+    inline double& Qv( int i, int j ) { return Q( GF::v, i, j ); }
 
-    const int cell_size = 3;  //!< A gridpoint has three cells
-
-    /** Access the gridpoint data.
-     *  The cells are: 0 = water depth, 1 = x-velocity, 2 = y-velocity.
+    /** Q(gf,i,j), a generic grid function at the gridpoint (i,j).
+     *
+     *  @warning The structure of the multidimensional grid array affects 
+     *           the optimization and the for-loop performance.
      */
-    inline double& Q( int cell, int i, int j )
+    inline double& Q( int gf, int i, int j )
     {
-        return grid[ ( cell * m + i ) * n + j ];
+        return grid[ ( i * n + j ) * GF::count + gf ];     // Fast
+        // return grid[ ( j * m + i ) * GF::count + gf ];  // Fast
+        // return grid[ ( gf * m + i ) * n + j ];          // Slow
     }
 
-    /** The timing function with a microsecond resolution.
-     */
-    static inline double gettime( void )
-    {
-        struct timeval tv;
-        gettimeofday( &tv,NULL );
-        return tv.tv_sec + 1e-6 * tv.tv_usec;
-    }
+    ///////////////////////////////////////////////////////////////////////////
+    // The integration variabls
+    ///////////////////////////////////////////////////////////////////////////
+
+    double tend;  //!< The integration end time
+
+    double dx;    //!< The distance between two volumes in the x-direction
+    double dy;    //!< The distance between two volumes in the y-direction
+    double dt;    //!< The time step
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Public methods
+    ///////////////////////////////////////////////////////////////////////////
 
 public:
 
-    /** Constructs an instance of the solver (allocates the memory
-     *  and sets up all parameters for the problem).
+    /** Constructs the solver: allocates the memory and sets up all
+     *  parameters for the problem.
      */
-    ShallowWater2D( int mSize, int nSize, double tEnd )
+    ShallowWater2D
+    ( 
+        int    mSize  = 1024,  //!< Use m volumes (grid points) in the x-direction
+        int    nSize  = 1024,  //!< Use n volumes (grid points) in the y-direction
+        double tEnd   = 0.1,   //!< The integration end time
+        double xstart = 0.0,   //!< The domain starts here along the x-direction
+        double xend   = 4.0,   //!< The domain ends here along the x-direction
+        double ystart = 0.0,   //!< The domain starts here along the y-direction
+        double yend   = 4.0    //!< The domain ends here along the y-direction
+    )   
         : m( mSize ), n( nSize ), tend( tEnd )
     {
-        dx = ( xend - xstart ) / m;  // Distance between two volumes (x-direction)
-        dy = ( yend - ystart ) / n;  // Distance between two volumes (y-direction)
+        dx = ( xend - xstart ) / m;  // Grid spacing in the x-direction
+        dy = ( yend - ystart ) / n;  // Grid spacing in the y-direction
         dt = dx / sqrt( g * 5.0 );   // Time step
 
         // Add two ghost volumes at each side of the domain
@@ -69,7 +102,7 @@ public:
 
         // Allocate memory for the domain
         //
-        grid = new double[ m * n * cell_size ];
+        grid = new double[ m * n * GF::count ];
 
         // x coordinates
         //
@@ -81,10 +114,12 @@ public:
         // y coordinates
         //
         y = new double[ n ];
-        for( int i = 0; i < n; ++i  ) {
-            y[i] = ystart - dy / 2 + i * dy;
+        for( int j = 0; j < n; ++j  ) {
+            y[j] = ystart - dy / 2 + j * dy;
         }
 
+        std::cout << "m = " << m << ", n = " << n
+            << ", tEnd = " << tend << std::flush;
     }
 
     /** Destructs an object (it only frees the allocated memory).
@@ -102,30 +137,34 @@ public:
     (
         double height = 4.0, //!< A nominal height
         double eps    = 2.0, //!< A height of the bump (added to the height)
-        double delta  = 0.5  //!< The bump is in fact divided by delta^2
+        double delta  = 0.5, //!< The bump is in fact divided by delta^2
+        double xpos   = 1.0, //!< The bump x-position
+        double ypos   = 1.0  //!< The bump y-position
     )
     {
-        for( int i = 0; i < m; ++i )
+        #pragma omp parallel
         {
-            for( int j = 0; j < n; ++j )
+            #pragma omp for collapse(2)
+            for( int i = 0; i < m; ++i )
             {
-                Q( 0, i, j ) = height;
-                Q( 1, i, j ) = 0.0;
-                Q( 2, i, j ) = 0.0;
+                for( int j = 0; j < n; ++j )
+                {
+                    Qh( i, j ) = height;
+                    Qu( i, j ) = 0.0;
+                    Qv( i, j ) = 0.0;
+                }
             }
-        }
 
-        for( int i = 1; i < m-1; ++i )
-        {
-            for( int j = 1; j < n-1; ++j )
+            #pragma omp for collapse(2)
+            for( int i = 1; i < m - 1; ++i )
             {
-                Q( 0, i, j )
-                    = height
-                    + eps * exp(
-                             - (   pow( x[i] - xend / 4.0, 2 )
-                                 + pow( y[j] - yend / 4.0, 2 )
-                             ) / pow( delta, 2 )
-                          );
+                for( int j = 1; j < n - 1; ++j )
+                {
+                    Qh( i, j ) = height
+                        + eps * exp( - (   SQR( x[i] - xpos )
+                                         + SQR( y[j] - ypos )
+                                       ) / SQR( delta ) );
+                }
             }
         }
     }
@@ -134,19 +173,16 @@ public:
      */
     void Validate ()
     {
-        for( int i = 0; i < n; ++i )
+        for( int i = 0; i < m; ++i )
         {
-            for( int j = 0; j < m; ++j )
+            for( int j = 0; j < n; ++j )
             {
-                for( int k = 0; k < cell_size; ++k )
+                for( int gf = 0; gf < GF::count; ++gf )
                 {
-                    if( ! std::isfinite( Q( k, j, i ) ) )
+                    if( ! std::isfinite( Q( gf, i, j ) ) )
                     {
-                        {
-                            std::cerr << std::endl << "Invalid solution!" 
-                                << std::endl << std::endl;
-                            exit( -1 );
-                        }
+                        std::cerr << "Data validation failed." << std::endl;
+                        exit( -1 );
                     }
                 }
             }
@@ -161,155 +197,100 @@ public:
      */
     void Solver ();
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Private methods
+    ///////////////////////////////////////////////////////////////////////////
+
 private:
 
-    /** The Lax-Friedrich's scheme for updating volumes.
+    /** Square of a number.
      */
-    void laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy );
+    static inline double SQR( const double& x ) { return x * x; }
+
+    /** Returns the current time in seconds with a microsecond resolution.
+     */
+    static inline double gettime( void )
+    {
+        struct timeval tv;
+        gettimeofday( &tv, NULL );
+        return tv.tv_sec + 1e-6 * tv.tv_usec;
+    }
+
+    /** Updates the boundary conditions.
+     */
+    void update_bc ()
+    {
+        // Mask for the reflective boundary conditions
+        //
+        const double bc_mask[ GF::count ] = { 1.0, -1.0, -1.0 }; 
+
+        #pragma omp for collapse(2)
+        for( int j = 1; j < n - 1; ++j )
+        {
+            for( int gf = 0; gf < GF::count; ++gf )
+            {
+                Q( gf, 0,   j ) = bc_mask[gf] * Q( gf, 1,   j );
+                Q( gf, m-1, j ) = bc_mask[gf] * Q( gf, m-2, j );
+            }
+        }
+
+        #pragma omp for collapse(2)
+        for( int j = 0; j < m; ++j )
+        {
+            for( int gf = 0; gf < GF::count; ++gf )
+            {
+                Q( gf, j, 0   ) = bc_mask[gf] * Q( gf, j, 1   );
+                Q( gf, j, n-1 ) = bc_mask[gf] * Q( gf, j, n-2 );
+            }
+        }
+    }
 
     /** Calculates the flux function in the x-direction.
      */
-    inline void calculate_ffx( double** ffx, int j )
+    void calculate_ffx( double** ffx, int j )
     {
         for( int i = 0; i < m; ++i )
         {
-            ffx[0][i] = Q(1, i, j);
-            ffx[1][i] = ( pow(Q(1, i, j), 2) / Q(0, i, j) )
-                        + ( g * pow(Q(0, i, j), 2) ) / 2.0;
-            ffx[2][i] = ( Q(1, i, j) * Q(2, i, j)) / Q(0, i, j);
-        }
+            ffx[GF::h][i] = Qu( i, j );
 
+            ffx[GF::u][i] = Qu( i, j ) * Qu( i, j ) / Qh( i, j )
+                            + g * SQR( Qh(i, j ) ) / 2.0;
+
+            ffx[GF::v][i] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
+        }
     }
 
     /** Calculates the flux function in the y-direction.
      */
-    inline void calculate_ffy( double** ffy, int i )
+    void calculate_ffy( double** ffy, int i )
     {
         for( int j = 0; j < n; ++j )
         {
-            ffy[0][j] = Q(2, i, j);
-            ffy[1][j] = ( Q(1, i, j) * Q(2, i, j) ) / Q(0, i, j);
-            ffy[2][j] = ( pow(Q(2, i, j), 2) / Q(0, i, j) )
-                        + ( g * pow(Q(0, i, j), 2) ) / 2.0;
+            ffy[GF::h][j] = Qv( i, j );
+
+            ffy[GF::u][j] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
+
+            ffy[GF::v][j] = Qv( i, j ) * Qv( i, j ) / Qh( i, j ) 
+                            + g * SQR( Qh( i, j ) ) / 2.0;
         }
     }
+
+    /** The Lax-Friedrich's scheme for updating volumes.
+     */
+    void laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy );
 };
 
-/** This is the Lax-Friedrich's scheme for updating volumes
- *  Try to parallelize it in an efficient way!
+/** Saves the result in the vtk fileformat.
  */
-void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy )
-{
-    // Calculate and update the fluxes in the x-direction
-    //
-    for( int i = 1; i < n; ++i )
-    {
-        calculate_ffx( ffx, i );
-
-        for( int j = 1; j < m; ++j ) {
-            for( int k = 0; k < cell_size; ++k ) {
-                nFx[k][j] = 0.5 * ((ffx[k][j-1] + ffx[k][j]) -
-                                   dx/dt * (Q(k, j, i) - Q(k, j-1, i)));
-            }
-        }
-        for( int j = 1; j < m-1; ++j ) {
-            for( int k = 0; k < cell_size; ++k ) {
-                Q(k, j, i) = Q(k, j, i)  - dt/dx * ((nFx[k][j+1] - nFx[k][j]));
-            }
-        }
-    }
-
-    // Calculate and update the fluxes in the y-direction
-    //
-    for( int i = 1; i < m; ++i )
-    {
-        calculate_ffy( ffy, i );
-
-        for( int j = 1; j < n; ++j ) {
-            for( int k = 0; k < cell_size; ++k ) {
-                nFy[k][j] = 0.5 * ((ffy[k][j-1] + ffy[k][j]) -
-                                   dy/dt * (Q(k, i, j) - Q(k, i, j -1)));
-            }
-        }
-        for( int j = 1; j <  n-1; ++j ) {
-            for( int k = 0; k < cell_size; ++k ) {
-                Q(k,i,j) = Q(k,i,j) -  dt/dy * ((nFy[k][j+1]  -  nFy[k][j]));
-            }
-        }
-    }
-}
-
-/** This is the main solver routine, parallelize this.
- *  But don't forget the subroutine laxf_scheme_2d.
- */
-void ShallowWater2D::Solver ()
-{
-    double stime = gettime ();
-
-    double bc_mask[3] = { 1.0, -1.0, -1.0 }; // Boundary condition mask
-
-    int steps = std::ceil( tend / dt );
-
-    double time = 0;
-
-    // Allocate memory for the fluxes in the x- and y-direction
-    //
-    double** ffx = new double*[ cell_size ];  ffx[0] = new double[ cell_size * m ];
-    double** nFx = new double*[ cell_size ];  nFx[0] = new double[ cell_size * m ];
-
-    double** ffy = new double*[ cell_size ];  ffy[0] = new double[ cell_size * n ];
-    double** nFy = new double*[ cell_size ];  nFy[0] = new double[ cell_size * n ];
-
-    for( int k = 1; k < cell_size; ++k )
-    {
-        ffx[k] =  ffx[0] + k * m;    ffy[k] =  ffy[0] + k * n;
-        nFx[k] =  nFx[0] + k * m;    nFy[k] =  nFy[0] + k * n;
-    }
-
-    for( int i = 0; i < steps; ++i, time += dt )
-    {
-        // Apply the boundary conditions
-        //
-        for( int j = 1; j < n - 1; ++j )
-        {
-            for( int k = 0; k < cell_size; ++k )
-            {
-                Q( k, 0,   j ) = bc_mask[k] * Q( k, 1, j );
-                Q( k, m-1, j ) = bc_mask[k] * Q( k, m-2, j);
-            }
-        }
-
-        for( int j = 0; j < m; ++j )
-        {
-            for( int k = 0; k < cell_size; ++k )
-            {
-                Q( k, j, 0   ) = bc_mask[k] * Q( k, j, 1   );
-                Q( k, j, n-1 ) = bc_mask[k] * Q( k, j, n-2 );
-            }
-        }
-
-        // Update all the volumes using the Lax-Friedrich's scheme.
-        //
-        laxf_scheme_2d( ffx, ffy, nFx, nFy );
-    }
-
-    // Free the fluxes
-    //
-    delete[] ffx[0];   delete[] ffx;
-    delete[] nFx[0];   delete[] nFx;
-
-    delete[] ffy[0];   delete[] ffy;
-    delete[] nFy[0];   delete[] nFy;
-
-    double etime = gettime ();
-    std::cout << "Solver took " << etime - stime << " seconds" << std::endl;
-}
-
 void ShallowWater2D::SaveData( const std::string filename )
 {
     FILE *fp = fopen( filename.c_str(), "w" );
+    if( fp == NULL ) {
+        std::cerr << "Failed to open " << filename << " for writing" << std::endl;
+        return;
+    }
 
-    // Write vtk Datafile header
+    // Write the vtk-file header
     //
     fprintf( fp, "# vtk DataFile Version 2.0\n"
                  "VTK\n"
@@ -323,7 +304,7 @@ void ShallowWater2D::SaveData( const std::string filename )
     for( int j = 0; j < n; ++j )
     {
         for( int i = 0; i < m; ++i ) {
-            fprintf( fp, "%e %e %e\n", x[i], y[j], Q(0, i, j) );
+            fprintf( fp, "%e %e %e\n", x[i], y[j], Qh( i, j ) );
         }
     }
 
@@ -350,23 +331,158 @@ void ShallowWater2D::SaveData( const std::string filename )
     for( int j = 0; j < n; ++j )
     {
         for( int i = 0; i < m; ++i ) {
-            fprintf( fp, "%e\n", Q( 0, i, j ) );
+            fprintf( fp, "%e\n", Qh( i, j ) );
         }
     }
+
     fclose( fp );
+
+    std::cout << "Data saved to " << filename << std::endl;
 }
 
-/** This is the main routine of the program, which allocates memory
- *  and setup all parameters for the problem.
- *
- *  You don't need to parallelize anything here!
- *
- *  However, it might be useful to change the problem volume size (m,n)
- *  during debugging.
+/** Uses the Lax-Friedrich's scheme for updating the volumes.
+ */
+void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy )
+{
+    const double dx_over_dt = dx/dt, dy_over_dt = dy/dt, 
+                 dt_over_dx = dt/dx, dt_over_dy = dt/dy;
+
+    // Loop along the y-direction
+    //
+    #pragma omp for
+    for( int j = 1; j < n; ++j )
+    {
+        calculate_ffx( ffx, j ); // calculates ffx from Q
+
+        // Update the fluxes in the x-direction
+        //
+        for( int i = 1; i < m; ++i ) 
+        {
+            for( int gf = 0; gf < GF::count; ++gf ) 
+            {
+                nFx[gf][i] = 0.5 * ( ( ffx[gf][i-1] + ffx[gf][i] ) 
+                             - dx_over_dt * ( Q(gf, i, j) - Q(gf, i-1, j) ) );
+            }
+        }
+
+        // Update the volume Q with the fluxes
+        //
+        for( int i = 1; i < m-1; ++i ) 
+        {
+            for( int gf = 0; gf < GF::count; ++gf ) 
+            {
+                Q(gf,i,j) -= dt_over_dx * ( nFx[gf][i+1] - nFx[gf][i] );
+            }
+        }
+    }
+
+    // Loop along the x-direction
+    //
+    #pragma omp for
+    for( int i = 1; i < m; ++i )
+    {
+        calculate_ffy( ffy, i ); // calculates ffy from Q
+
+        // Update the fluxes in the y-direction
+        //
+        for( int j = 1; j < n; ++j ) 
+        {
+            for( int gf = 0; gf < GF::count; ++gf ) 
+            {
+                nFy[gf][j] = 0.5 * ( ( ffy[gf][j-1] + ffy[gf][j] ) 
+                             - dy_over_dt * ( Q(gf, i, j) - Q(gf, i, j-1) ) );
+            }
+        }
+
+        // Update the volume Q with the fluxes
+        //
+        for( int j = 1; j < n - 1; ++j ) 
+        {
+            for( int gf = 0; gf < GF::count; ++gf ) 
+            {
+                Q(gf,i,j) -= dt_over_dy * ( nFy[gf][j+1] - nFy[gf][j] );
+            }
+        }
+    }
+}
+
+/** This is the main solver routine, parallelize this.
+ *  But don't forget the subroutine laxf_scheme_2d.
+ */
+void ShallowWater2D::Solver ()
+{
+    double stime = gettime ();
+
+    int steps = std::ceil( tend / dt );
+
+    #pragma omp parallel
+    {
+        #pragma omp master
+        std::cout << ", num_threads = " << omp_get_num_threads () << std::flush;
+
+        // Allocate memory for the fluxes in the x- and y-direction
+        //
+        double** ffx = new double*[ GF::count ];
+        double** nFx = new double*[ GF::count ];
+        double** ffy = new double*[ GF::count ];
+        double** nFy = new double*[ GF::count ];
+
+        ffx[0] = new double[ GF::count * m ];
+        nFx[0] = new double[ GF::count * m ];
+        ffy[0] = new double[ GF::count * n ];
+        nFy[0] = new double[ GF::count * n ];
+
+        for( int gf = 1; gf < GF::count; ++gf )
+        {
+            ffx[gf] = ffx[0] + gf * m;
+            nFx[gf] = nFx[0] + gf * m;
+            ffy[gf] = ffy[0] + gf * n;
+            nFy[gf] = nFy[0] + gf * n;
+        }
+
+        // Apply the boundary conditions then 
+        // update all the volumes using the Lax-Friedrich's scheme.
+        //
+        double time = 0;
+        for( int i = 0; i < steps; ++i, time += dt )
+        {
+            update_bc ();
+            laxf_scheme_2d( ffx, ffy, nFx, nFy );
+        }
+
+        // Free the memory reserved for the fluxes
+        //
+        delete[] ffx[0];   delete[] ffx;
+        delete[] nFx[0];   delete[] nFx;
+
+        delete[] ffy[0];   delete[] ffy;
+        delete[] nFy[0];   delete[] nFy;
+    }
+
+    std::cout << ", elapsed = " << ( gettime() - stime ) << std::endl;
+}
+
+/** The main program entry which instantiates the ShallowWater2D object,
+ *  loads the initial data, runs the solver using the Lax-Friedrich's scheme,
+ *  verifies the result, and optionally saves the vtk file.
 */
 int main( int argc, char** argv )
 {
-    ShallowWater2D shWater( /* m */ 1024, /* n */ 1024, /* tEnd */ 0.1 );
+    int    nThreads = argc >= 2 ? atoi   ( argv[1]       ) : -1   ;
+    int    mSize    = argc >= 3 ? atoi   ( argv[2]       ) : 1024 ;
+    int    nSize    = argc >= 4 ? atoi   ( argv[3]       ) : 1024 ;
+    double tEnd     = argc >= 5 ? strtod ( argv[4], NULL ) : 0.1  ;
+    int    useVTK   = argc >= 6 ? atoi   ( argv[5]       ) : 0    ;
+
+    if ( argc == 3 ) { // If given m, but not n
+        nSize = mSize;
+    }
+
+    if( nThreads > 0 ) {
+        omp_set_num_threads( nThreads );
+    }
+
+    ShallowWater2D shWater( mSize, nSize, tEnd );
 
     shWater.InitialData ();
 
@@ -374,11 +490,9 @@ int main( int argc, char** argv )
 
     shWater.Validate ();
 
-    // Use -DEXPORT_VTK if you want visualize the result in ParaView.
-    //
-    #ifdef EXPORT_VTK
+    if( useVTK ) {
         shWater.SaveData ();
-    #endif
+    }
 
     return 0;
 }
