@@ -11,10 +11,8 @@
 class ShallowWater2D
 {
     const double g      = 9.81;  //!< Standard acceleration of the Earth
-
     const double xstart = 0.0;   //!< The domain starts here in the x-direction
     const double xend   = 4.0;   //!< The domain ends here in the x-direction
-
     const double ystart = 0.0;   //!< THe domain starts here in the y-direction
     const double yend   = 4.0;   //!< The domain ends here in the y-direction
 
@@ -96,6 +94,10 @@ public:
         delete[] y;
     }
 
+    /** Square of a number.
+     */
+    static inline double pow2( const double& x ) { return x * x; }
+
     /** Constructs a Gauss hump as the initial data.
      */
     void InitialData
@@ -122,9 +124,9 @@ public:
                 Q( 0, i, j )
                     = height
                     + eps * exp(
-                             - (   pow( x[i] - xend / 4.0, 2 )
-                                 + pow( y[j] - yend / 4.0, 2 )
-                             ) / pow( delta, 2 )
+                             - (   pow2( x[i] - xend / 4.0 )
+                                 + pow2( y[j] - yend / 4.0 )
+                               ) / pow2( delta )
                           );
             }
         }
@@ -174,11 +176,12 @@ private:
         for( int i = 0; i < m; ++i )
         {
             ffx[0][i] = Q(1, i, j);
-            ffx[1][i] = ( pow(Q(1, i, j), 2) / Q(0, i, j) )
-                        + ( g * pow(Q(0, i, j), 2) ) / 2.0;
-            ffx[2][i] = ( Q(1, i, j) * Q(2, i, j)) / Q(0, i, j);
-        }
 
+            ffx[1][i] = pow2( Q(1, i, j) ) / Q(0, i, j)
+                        + g * pow2( Q(0, i, j) ) / 2.0;
+
+            ffx[2][i] = Q(1, i, j) * Q(2, i, j) / Q(0, i, j);
+        }
     }
 
     /** Calculates the flux function in the y-direction.
@@ -188,9 +191,11 @@ private:
         for( int j = 0; j < n; ++j )
         {
             ffy[0][j] = Q(2, i, j);
-            ffy[1][j] = ( Q(1, i, j) * Q(2, i, j) ) / Q(0, i, j);
-            ffy[2][j] = ( pow(Q(2, i, j), 2) / Q(0, i, j) )
-                        + ( g * pow(Q(0, i, j), 2) ) / 2.0;
+
+            ffy[1][j] = Q(1, i, j) * Q(2, i, j) / Q(0, i, j);
+
+            ffy[2][j] = pow2( Q(2, i, j) ) / Q(0, i, j) 
+                        + g * pow2( Q(0, i, j) ) / 2.0;
         }
     }
 };
@@ -205,17 +210,20 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
     #pragma omp for
     for( int i = 1; i < n; ++i )
     {
-        calculate_ffx( ffx, i );
+        calculate_ffx( ffx, i ); // calculates ffx from Q
 
-        for( int j = 1; j < m; ++j ) {
+        for( int j = 1; j < m; ++j ) 
+        {
             for( int k = 0; k < cell_size; ++k ) {
-                nFx[k][j] = 0.5 * ((ffx[k][j-1] + ffx[k][j]) -
-                                   dx/dt * (Q(k, j, i) - Q(k, j-1, i)));
+                nFx[k][j] = 0.5 * ( ( ffx[k][j-1] + ffx[k][j] ) 
+                                   - dx/dt * ( Q(k, j, i) - Q(k, j-1, i) ) );
             }
         }
-        for( int j = 1; j < m-1; ++j ) {
+
+        for( int j = 1; j < m-1; ++j ) 
+        {
             for( int k = 0; k < cell_size; ++k ) {
-                Q(k, j, i) = Q(k, j, i)  - dt/dx * ((nFx[k][j+1] - nFx[k][j]));
+                Q(k, j, i) = Q(k, j, i) - dt/dx * ( nFx[k][j+1] - nFx[k][j] );
             }
         }
     }
@@ -225,17 +233,20 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
     #pragma omp for
     for( int i = 1; i < m; ++i )
     {
-        calculate_ffy( ffy, i );
+        calculate_ffy( ffy, i ); // calculates ffy from Q
 
-        for( int j = 1; j < n; ++j ) {
+        for( int j = 1; j < n; ++j ) 
+        {
             for( int k = 0; k < cell_size; ++k ) {
-                nFy[k][j] = 0.5 * ((ffy[k][j-1] + ffy[k][j]) -
-                                   dy/dt * (Q(k, i, j) - Q(k, i, j -1)));
+                nFy[k][j] = 0.5 * ( ( ffy[k][j-1] + ffy[k][j] ) 
+                                   - dy/dt * ( Q(k, i, j) - Q(k, i, j-1) ) );
             }
         }
-        for( int j = 1; j <  n-1; ++j ) {
+
+        for( int j = 1; j <  n-1; ++j ) 
+        {
             for( int k = 0; k < cell_size; ++k ) {
-                Q(k,i,j) = Q(k,i,j) -  dt/dy * ((nFy[k][j+1]  -  nFy[k][j]));
+                Q(k,i,j) = Q(k,i,j) - dt/dy * ( nFy[k][j+1] - nFy[k][j] );
             }
         }
     }
@@ -263,16 +274,16 @@ void ShallowWater2D::Solver ()
 
         // Allocate memory for the fluxes
         //
-        ffx = new double*[ cell_size ];  ffx[0] = new double[ cell_size * m ];
-        nFx = new double*[ cell_size ];  nFx[0] = new double[ cell_size * m ];
+        ffx = new double*[ cell_size ];    ffx[0] = new double[ cell_size * m ];
+        nFx = new double*[ cell_size ];    nFx[0] = new double[ cell_size * m ];
 
-        ffy = new double*[ cell_size ];  ffy[0] = new double[ cell_size * n ];
-        nFy = new double*[ cell_size ];  nFy[0] = new double[ cell_size * n ];
+        ffy = new double*[ cell_size ];    ffy[0] = new double[ cell_size * n ];
+        nFy = new double*[ cell_size ];    nFy[0] = new double[ cell_size * n ];
 
-        for( int i = 1; i < cell_size; ++i )
+        for( int k = 1; k < cell_size; ++k )
         {
-            ffx[i] =  ffx[0] + i * m;    ffy[i] =  ffy[0] + i * n;
-            nFx[i] =  nFx[0] + i * m;    nFy[i] =  nFy[0] + i * n;
+            ffx[k] =  ffx[0] + k * m;      ffy[k] =  ffy[0] + k * n;
+            nFx[k] =  nFx[0] + k * m;      nFy[k] =  nFy[0] + k * n;
         }
 
         for( int i = 0; i < steps; ++i, time += dt )
@@ -285,7 +296,7 @@ void ShallowWater2D::Solver ()
                 for( int k = 0; k < cell_size; ++k )
                 {
                     Q( k, 0,   j ) = bc_mask[k] * Q( k, 1, j );
-                    Q( k, m-1, j ) = bc_mask[k] * Q( k, m-2, j);
+                    Q( k, m-1, j ) = bc_mask[k] * Q( k, m-2, j );
                 }
             }
 
