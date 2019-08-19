@@ -260,10 +260,10 @@ void ShallowWater2D::Solver ()
     double** ffy = new double*[ cell_size ];  ffy[0] = new double[ cell_size * n ];
     double** nFy = new double*[ cell_size ];  nFy[0] = new double[ cell_size * n ];
 
-    for( int i = 1; i < cell_size; ++i )
+    for( int k = 1; k < cell_size; ++k )
     {
-        ffx[i] =  ffx[0] + i * m;    ffy[i] =  ffy[0] + i * n;
-        nFx[i] =  nFx[0] + i * m;    nFy[i] =  nFy[0] + i * n;
+        ffx[k] =  ffx[0] + k * m;    ffy[k] =  ffy[0] + k * n;
+        nFx[k] =  nFx[0] + k * m;    nFy[k] =  nFy[0] + k * n;
     }
 
     for( int i = 0; i < steps; ++i, time += dt )
