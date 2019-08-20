@@ -1,4 +1,6 @@
 FC = ftn
+FC = gfortran
+
 ifeq ($(CRAY_PRGENVCRAY), loaded)
 FFLAGS = -O2 -openmp
 else ifeq ($(CRAY_PRGENVINTEL), loaded)
@@ -11,7 +13,12 @@ FFLAGS = -O2 -fopenmp
 else
 FFLAGS = -O2
 endif
+
 SRC = vtk_export.f90 shwater2d.f90
+SRC = vtk_export.f90 shwater2d_naive.f90
+SRC = vtk_export.f90 shwater2d_opt_transpose.f90
+SRC = vtk_export.f90 shwater2d_opt_transpose_and_numerics.f90
+
 OBJS = ${SRC:.f90=.o}
 DEST = shwater2d
 
