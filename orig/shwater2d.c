@@ -152,8 +152,8 @@ int main(int argc, char **argv) {
   
 
   /* Use m volumes in the x-direction and n volumes in the y-direction */    
-  m = 1024;
-  n = 1024;
+  m = 1000;
+  n = 1000;
   
   /*
     epsi      Parameter used for initial condition
