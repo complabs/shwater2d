@@ -27,7 +27,6 @@ echo
 
 for n in `seq 0 1 $THREADS`; do 
     #$PROG $n 1000 1000 0.1; 
-    #$PROG $n 1024 1024 0.1; 
-    $PROG $n 2048 2048 0.1; 
+    $PROG $n 2000 2000 0.1; 
 done
 

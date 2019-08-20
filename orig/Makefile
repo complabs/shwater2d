@@ -1,4 +1,4 @@
-CC = gcc
+CC = cc
 CFLAGS = -O2 -fopenmp
 
 ifeq ($(CRAY_PRGENVCRAY), loaded)
