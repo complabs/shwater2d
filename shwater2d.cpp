@@ -7,11 +7,11 @@
 
 namespace GF
 {
-    /** The grid functions (which name cells at a gridpoint).
+    /** The grid functions (they are naming the cells at a gridpoint).
      */
     enum GridFunctions
     { 
-        h = 0,  //!< Water depth
+        h = 0,  //!< Water height (or depth)
         u,      //!< x-velocity
         v,      //!< y-velocity
         count   //!< Number of grid functions at a gridpoint
@@ -25,7 +25,7 @@ namespace GF
 class ShallowWater2D
 {
     ///////////////////////////////////////////////////////////////////////////
-    // The constants
+    // Constants
     ///////////////////////////////////////////////////////////////////////////
 
     const double g = 9.81;  //!< The acceleration due to gravity 
@@ -42,7 +42,7 @@ class ShallowWater2D
     double* x;  //!< The x-coordinates of the domain, dim = `m`
     double* y;  //!< The y coordinates of the domain, dim = `n`
 
-    // The grid functions
+    // Grid functions
     //
     inline double& Qh( int i, int j ) { return Q( GF::h, i, j ); }
     inline double& Qu( int i, int j ) { return Q( GF::u, i, j ); }
@@ -61,14 +61,14 @@ class ShallowWater2D
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    // The integration variabls
+    // Integration variabls
     ///////////////////////////////////////////////////////////////////////////
 
-    double tend;  //!< The integration end time
+    double tend;  //!< End time of integration
 
-    double dx;    //!< The distance between two volumes in the x-direction
-    double dy;    //!< The distance between two volumes in the y-direction
-    double dt;    //!< The time step
+    double dx;    //!< Distance between two volumes in the x-direction
+    double dy;    //!< Distance between two volumes in the y-direction
+    double dt;    //!< Time step
 
     ///////////////////////////////////////////////////////////////////////////
     // Public methods
@@ -118,8 +118,7 @@ public:
             y[j] = ystart - dy / 2 + j * dy;
         }
 
-        std::cout << "m = " << m << ", n = " << n
-            << ", tEnd = " << tend << std::flush;
+        std::cout << m << ", " << n << ", " << tend << ", " << std::flush;
     }
 
     /** Destructs an object (it only frees the allocated memory).
@@ -245,36 +244,6 @@ private:
         }
     }
 
-    /** Calculates the flux function in the x-direction.
-     */
-    void calculate_ffx( double** ffx, int j )
-    {
-        for( int i = 0; i < m; ++i )
-        {
-            ffx[GF::h][i] = Qu( i, j );
-
-            ffx[GF::u][i] = Qu( i, j ) * Qu( i, j ) / Qh( i, j )
-                            + g * SQR( Qh(i, j ) ) / 2.0;
-
-            ffx[GF::v][i] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
-        }
-    }
-
-    /** Calculates the flux function in the y-direction.
-     */
-    void calculate_ffy( double** ffy, int i )
-    {
-        for( int j = 0; j < n; ++j )
-        {
-            ffy[GF::h][j] = Qv( i, j );
-
-            ffy[GF::u][j] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
-
-            ffy[GF::v][j] = Qv( i, j ) * Qv( i, j ) / Qh( i, j ) 
-                            + g * SQR( Qh( i, j ) ) / 2.0;
-        }
-    }
-
     /** The Lax-Friedrich's scheme for updating volumes.
      */
     void laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy );
@@ -342,17 +311,32 @@ void ShallowWater2D::SaveData( const std::string filename )
 
 /** Uses the Lax-Friedrich's scheme for updating the volumes.
  */
-void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, double** nFy )
+void ShallowWater2D::laxf_scheme_2d
+    ( 
+        double** ffx, double** ffy, 
+        double** nFx, double** nFy 
+    )
 {
-    const double dx_over_dt = dx/dt, dy_over_dt = dy/dt, 
-                 dt_over_dx = dt/dx, dt_over_dy = dt/dy;
+    const double dt_over_dx = dt/dx, dt_over_dy = dt/dy;
+    const double dx_over_dt = dx/dt, dy_over_dt = dy/dt; 
 
+    ///////////////////////////////////////////////////////////////////////////
     // Loop along the y-direction
     //
-    #pragma omp for
+    #pragma omp for schedule(static)
     for( int j = 1; j < n; ++j )
     {
-        calculate_ffx( ffx, j ); // calculates ffx from Q
+        // Calculate the flux functions in the x-direction.
+        //
+        for( int i = 0; i < m; ++i )
+        {
+            ffx[GF::h][i] = Qu( i, j );
+
+            ffx[GF::u][i] = Qu( i, j ) * Qu( i, j ) / Qh( i, j )
+                            + g * SQR( Qh(i, j ) ) / 2.0;
+
+            ffx[GF::v][i] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
+        }
 
         // Update the fluxes in the x-direction
         //
@@ -361,27 +345,38 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
             for( int gf = 0; gf < GF::count; ++gf ) 
             {
                 nFx[gf][i] = 0.5 * ( ( ffx[gf][i-1] + ffx[gf][i] ) 
-                             - dx_over_dt * ( Q(gf, i, j) - Q(gf, i-1, j) ) );
+                             - dx_over_dt * ( Q( gf, i, j ) - Q( gf, i-1, j ) ) );
             }
         }
 
         // Update the volume Q with the fluxes
         //
-        for( int i = 1; i < m-1; ++i ) 
+        for( int i = 1; i < m - 1; ++i ) 
         {
             for( int gf = 0; gf < GF::count; ++gf ) 
             {
-                Q(gf,i,j) -= dt_over_dx * ( nFx[gf][i+1] - nFx[gf][i] );
+                Q( gf, i, j ) -= dt_over_dx * ( nFx[gf][i+1] - nFx[gf][i] );
             }
         }
     }
 
+    ///////////////////////////////////////////////////////////////////////////
     // Loop along the x-direction
     //
-    #pragma omp for
+    #pragma omp for schedule(static)
     for( int i = 1; i < m; ++i )
     {
-        calculate_ffy( ffy, i ); // calculates ffy from Q
+        // Calculate the flux functions in the y-direction.
+        //
+        for( int j = 0; j < n; ++j )
+        {
+            ffy[GF::h][j] = Qv( i, j );
+
+            ffy[GF::u][j] = Qu( i, j ) * Qv( i, j ) / Qh( i, j );
+
+            ffy[GF::v][j] = Qv( i, j ) * Qv( i, j ) / Qh( i, j ) 
+                            + g * SQR( Qh( i, j ) ) / 2.0;
+        }
 
         // Update the fluxes in the y-direction
         //
@@ -390,7 +385,8 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
             for( int gf = 0; gf < GF::count; ++gf ) 
             {
                 nFy[gf][j] = 0.5 * ( ( ffy[gf][j-1] + ffy[gf][j] ) 
-                             - dy_over_dt * ( Q(gf, i, j) - Q(gf, i, j-1) ) );
+                             - dy_over_dt * ( Q( gf, i, j ) - Q( gf, i, j-1 ) ) );
+
             }
         }
 
@@ -400,7 +396,7 @@ void ShallowWater2D::laxf_scheme_2d( double** ffx, double** ffy, double** nFx, d
         {
             for( int gf = 0; gf < GF::count; ++gf ) 
             {
-                Q(gf,i,j) -= dt_over_dy * ( nFy[gf][j+1] - nFy[gf][j] );
+                Q( gf, i, j ) -= dt_over_dy * ( nFy[gf][j+1] - nFy[gf][j] );
             }
         }
     }
@@ -418,7 +414,7 @@ void ShallowWater2D::Solver ()
     #pragma omp parallel
     {
         #pragma omp master
-        std::cout << ", num_threads = " << omp_get_num_threads () << std::flush;
+        std::cout <<  omp_get_num_threads () << ", " << std::flush;
 
         // Allocate memory for the fluxes in the x- and y-direction
         //
@@ -459,7 +455,7 @@ void ShallowWater2D::Solver ()
         delete[] nFy[0];   delete[] nFy;
     }
 
-    std::cout << ", elapsed = " << ( gettime() - stime ) << std::endl;
+    std::cout << ( gettime() - stime ) << std::endl;
 }
 
 /** The main program entry which instantiates the ShallowWater2D object,
@@ -468,6 +464,10 @@ void ShallowWater2D::Solver ()
 */
 int main( int argc, char** argv )
 {
+    #if defined(OPT_NUMERICS)
+        std::cout << "* " << std::flush;
+    #endif
+
     int    nThreads = argc >= 2 ? atoi   ( argv[1]       ) : -1   ;
     int    mSize    = argc >= 3 ? atoi   ( argv[2]       ) : 1024 ;
     int    nSize    = argc >= 4 ? atoi   ( argv[3]       ) : 1024 ;
