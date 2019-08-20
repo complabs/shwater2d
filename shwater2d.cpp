@@ -323,7 +323,7 @@ void ShallowWater2D::laxf_scheme_2d
     ///////////////////////////////////////////////////////////////////////////
     // Loop along the y-direction
     //
-    #pragma omp for schedule(static)
+    #pragma omp for
     for( int j = 1; j < n; ++j )
     {
         // Calculate the flux functions in the x-direction.
@@ -363,7 +363,7 @@ void ShallowWater2D::laxf_scheme_2d
     ///////////////////////////////////////////////////////////////////////////
     // Loop along the x-direction
     //
-    #pragma omp for schedule(static)
+    #pragma omp for
     for( int i = 1; i < m; ++i )
     {
         // Calculate the flux functions in the y-direction.
@@ -464,10 +464,6 @@ void ShallowWater2D::Solver ()
 */
 int main( int argc, char** argv )
 {
-    #if defined(OPT_NUMERICS)
-        std::cout << "* " << std::flush;
-    #endif
-
     int    nThreads = argc >= 2 ? atoi   ( argv[1]       ) : -1   ;
     int    mSize    = argc >= 3 ? atoi   ( argv[2]       ) : 1024 ;
     int    nSize    = argc >= 4 ? atoi   ( argv[3]       ) : 1024 ;

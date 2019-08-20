@@ -323,7 +323,7 @@ void ShallowWater2D::laxf_scheme_2d
     ///////////////////////////////////////////////////////////////////////////
     // Loop along the y-direction
     //
-    #pragma omp for schedule(static)
+    #pragma omp for
     for( int j = 1; j < n; ++j )
     {
         // Calculate the flux functions in the x-direction.
@@ -357,7 +357,7 @@ void ShallowWater2D::laxf_scheme_2d
     ///////////////////////////////////////////////////////////////////////////
     // Loop along the x-direction
     //
-    #pragma omp for schedule(static)
+    #pragma omp for
     for( int i = 1; i < m; ++i )
     {
         // Calculate the flux functions in the y-direction.

@@ -11,12 +11,12 @@
 #SBATCH -o test-batch.out
 #SBATCH -e test-batch.err
 
-module load gcc  # tegner
+# tegner:
+#module load gcc  # tegner
+#THREADS=48
 
-#module swap PrgEnv-cray PrgEnv-gnu
-#module swap PrgEnv-cray PrgEnv-intel
-
-THREADS=64  # 48 on tegner, 64 on beskow
+# beskow:
+THREADS=64
 
 PROG=./shwater2d
 PROG=./shwater2d_opt
