@@ -18,7 +18,8 @@
 # beskow:
 THREADS=64
 
-PROG=./shwater2d
+#PROG=./shwater2d_ser
+#PROG=./shwater2d_par
 PROG=./shwater2d_opt
 
 echo
