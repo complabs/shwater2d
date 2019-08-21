@@ -10,5 +10,4 @@ shwater2d_ser
 shwater2d_opt
 orig/shwater2d
 orig/shwater2d_naive
-*.out
 *.err
