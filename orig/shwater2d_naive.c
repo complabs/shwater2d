@@ -177,8 +177,8 @@ int main(int argc, char **argv) {
   
 
   /* Use m volumes in the x-direction and n volumes in the y-direction */    
-  m = 1000;
-  n = 1000; 
+  m = argc >= 2 ? atoi( argv[1] ) : 1000;
+  n = argc >= 3 ? atoi( argv[2] ) : 1000;
   
   /*
     epsi      Parameter used for initial condition
@@ -234,7 +234,7 @@ int main(int argc, char **argv) {
 
   /* Uncomment this line if you want visualize the result in ParaView */
   extern void save_vtk(double *Q, double *x, double *y, int m, int n);
-  save_vtk(Q, x, y, m, n);
+  if( m == 1000 && n == 1000 ) save_vtk(Q, x, y, m, n);
 
 
 

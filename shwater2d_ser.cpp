@@ -3,7 +3,6 @@
 #include <cmath>       // needs isfinite()
 #include <cstdio>      // used by SaveData
 #include <sys/time.h>  // used by gettime
-#include <omp.h>
 
 namespace GF
 {
@@ -449,7 +448,7 @@ void ShallowWater2D::Solver ()
 */
 int main( int argc, char** argv )
 {
-    int    nThreads = argc >= 2 ? atoi   ( argv[1]       ) : -1   ;
+    // Note: argv[1] is ignored here (it will become nThreads later)
     int    mSize    = argc >= 3 ? atoi   ( argv[2]       ) : 1000 ;
     int    nSize    = argc >= 4 ? atoi   ( argv[3]       ) : 1000 ;
     double tEnd     = argc >= 5 ? strtod ( argv[4], NULL ) : 0.1  ;
@@ -457,10 +456,6 @@ int main( int argc, char** argv )
 
     if ( argc == 3 ) { // If given m, but not n
         nSize = mSize;
-    }
-
-    if( nThreads > 0 ) {
-        omp_set_num_threads( nThreads );
     }
 
     ShallowWater2D shWater( mSize, nSize, tEnd );

@@ -19,6 +19,8 @@ else
 endif
 
 all: shwater2d_ser shwater2d_par shwater2d_opt
+	@$(MAKE) -C orig
+	@#$(MAKE) -C f90
 
 shwater2d_ser : shwater2d_ser.cpp
 	$(CXX) $(CXXFLAGS) shwater2d_ser.cpp -o shwater2d_ser
@@ -33,6 +35,7 @@ clean:
 	rm -f shwater2d_ser shwater2d_par shwater2d_opt *.o
 	rm -f bin obj *.vtk
 	@$(MAKE) -C orig clean
+	@$(MAKE) -C f90 clean
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $<
@@ -52,5 +55,4 @@ test-ref:
 
 diff-ref:
 	diff result.vtk orig/result.vtk
-
 

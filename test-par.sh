@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-#SBATCH -J shwater2d
+#SBATCH -J shwater-par
 
 #SBATCH -A edu19.summer
 # BATCH --reservation=summer-2019-08-21
@@ -8,8 +8,8 @@
 #SBATCH -N 1
 #SBATCH -t 20:00
 
-#SBATCH -o test-batch.out
-#SBATCH -e test-batch.err
+#SBATCH -o test-par.out
+# BATCH -e test-par.err
 
 # tegner:
 #module load gcc  # tegner
@@ -18,16 +18,16 @@
 # beskow:
 THREADS=64
 
-#PROG=./shwater2d_ser
-#PROG=./shwater2d_par
-PROG=./shwater2d_opt
+# The variable PROBLEMSIZE is globally defined
+. problem-size
+
+PROG=./shwater2d_par
 
 echo
-echo "Running $PROG"
+echo "Running $PROG, size: $PROBLEMSIZE"
 echo
 
 for n in `seq 0 1 $THREADS`; do 
-    #$PROG $n 1000 1000 0.1; 
-    $PROG $n 2000 2000 0.1; 
+    $PROG $n $PROBLEMSIZE
 done
 
