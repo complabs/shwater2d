@@ -16,32 +16,12 @@
 
 cd orig
 
-echo
-echo "Running shwater2d $PROBLEMSIZE"
-echo
+THREADS=64 # on beskow
 
-./shwater2d $PROBLEMSIZE
+for n in `seq 1 1 $THREADS`; do 
+    export OMP_NUM_THREADS=$n
+    echo
+    echo "Threads $n "
+    srun -n 1 ./shwater2d_naive
+done
 
-echo
-echo "Running 1 thread shwater2d_naive $PROBLEMSIZE"
-echo
-
-OMP_NUM_THREADS=1 ./shwater2d_naive $PROBLEMSIZE
-
-echo
-echo "Running 16 thread shwater2d_naive $PROBLEMSIZE"
-echo
-
-OMP_NUM_THREADS=16 ./shwater2d_naive $PROBLEMSIZE
-
-echo
-echo "Running 32 shwater2d_naive $PROBLEMSIZE"
-echo
-
-OMP_NUM_THREADS=32 ./shwater2d_naive $PROBLEMSIZE
-
-echo
-echo "Running def #threads shwater2d_naive $PROBLEMSIZE"
-echo
-
-./shwater2d_naive $PROBLEMSIZE

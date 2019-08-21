@@ -17,9 +17,10 @@ cd f90
 
 THREADS=64 # on beskow
 
-for n in `seq 0 1 $THREADS`; do 
+for n in `seq 1 1 $THREADS`; do 
     export OMP_NUM_THREADS=$n
-    echo "\nThreads $n "
+    echo
+    echo "Threads $n "
     srun -n 1 ./shwater2d_naive
 done
 
