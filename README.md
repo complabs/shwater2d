@@ -4,24 +4,22 @@ This is a C++ implementation of:
 
 https://github.com/PDC-support/openmp-lab-exercises/tree/master/advanced_lab
 
+The following information is copied from the above reference:
+
 ## About this exercise
 
 The aim of this exercise is to give hands-on experience in parallelizing a
 larger program, measure parallel performance and gain experience in what to
 expect from modern multi-core architectures.
 
-In the exercise you will use a dual hexadeca-core shared memory Intel Xeon
+In the exercise we use a dual hexadeca-core shared memory Intel Xeon
 E5-2698v3 Haswell node. There will be several nodes available on the Cray for
 interactive use during the lab and each group will have access to a node of
-their own. Running the program should therefore give you realistic timings and
+their own. Running the program should therefore give realistic timings and
 speedup characteristics.
 
-Your task is to parallelize a finite-volume solver for the two dimensional
-shallow water equations. Measure speedup and if you have time, tune the code.
-You don’t need to understand the numerics in order to solve this exercise (a
-short description is given in Appendix A). However, it assumes some prior
-experience with OpenMP, please refer to the lecture on shared memory
-programming if necessary.
+The task is to parallelize a finite-volume solver for the two dimensional
+shallow water equations, measure speedup, and tune the code.
 
 ## Algorithm
 
