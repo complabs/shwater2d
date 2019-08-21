@@ -8,7 +8,7 @@
 #SBATCH -N 1
 #SBATCH -t 30:00
 
-#SBATCH -o test-f90-naive.out
+#SBATCH -o test-f90-opt-trnum.out
 # BATCH -e test-f90.err
 
 module swap PrgEnv-cray PrgEnv-gnu
@@ -20,6 +20,6 @@ THREADS=64 # on beskow
 for n in `seq 0 1 $THREADS`; do 
     export OMP_NUM_THREADS=$n
     echo "\nThreads $n "
-    srun -n 1 ./shwater2d_naive
+    srun -n 1 ./shwater2d_opt_trnum
 done
 

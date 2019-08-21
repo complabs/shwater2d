@@ -9,7 +9,7 @@
 #SBATCH -t 20:00
 
 #SBATCH -o test-ser.out
-# BATCH -e test-ser.err
+#SBATCH -e test-ser.err
 
 # tegner:
 #module load gcc  # tegner

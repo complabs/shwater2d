@@ -9,7 +9,7 @@
 #SBATCH -t 20:00
 
 #SBATCH -o test-ref.out
-# BATCH -e test-ref.err
+#SBATCH -e test-ref.err
 
 # The variable PROBLEMSIZE is globally defined
 . problem-size

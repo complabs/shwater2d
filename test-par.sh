@@ -3,7 +3,7 @@
 #SBATCH -J shwater-par
 
 #SBATCH -A edu19.summer
-# BATCH --reservation=summer-2019-08-21
+#SBATCH --reservation=summer-2019-08-21
 
 #SBATCH -N 1
 #SBATCH -t 20:00

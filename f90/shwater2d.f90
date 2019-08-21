@@ -43,8 +43,8 @@ program shwater2d
   !
   ! Use m volumes in the x-direction and n volumes in the y-direction
   !
-  m = 1000
-  n = 1000
+  m = 2000
+  n = 2000
   
 
   ! epsi      Parameter used for initial condition
