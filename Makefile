@@ -18,7 +18,10 @@ else
    SRUN = srun -n 1   
 endif
 
-all: shwater2d shwater2d_opt
+all: shwater2d_ser shwater2d shwater2d_opt
+
+shwater2d_ser : shwater2d_ser.cpp
+	$(CXX) $(CXXFLAGS) shwater2d_ser.cpp -o shwater2d_ser
 
 shwater2d : shwater2d.cpp
 	$(CXX) $(CXXFLAGS) shwater2d.cpp -o shwater2d
@@ -27,7 +30,7 @@ shwater2d_opt : shwater2d_opt.cpp
 	$(CXX) $(CXXFLAGS) shwater2d_opt.cpp -o shwater2d_opt
 
 clean:
-	rm -f shwater2d shwater2d_opt *.o
+	rm -f shwater2d_ser shwater2d shwater2d_opt *.o
 	rm -f bin obj *.vtk
 	@$(MAKE) -C orig clean
 

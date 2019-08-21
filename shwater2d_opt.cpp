@@ -91,6 +91,8 @@ public:
     )   
         : m( mSize ), n( nSize ), tend( tEnd )
     {
+        std::cout << m << ", " << n << ", " << tend << ", " << std::flush;
+
         dx = ( xend - xstart ) / m;  // Grid spacing in the x-direction
         dy = ( yend - ystart ) / n;  // Grid spacing in the y-direction
         dt = dx / sqrt( g * 5.0 );   // Time step
@@ -117,8 +119,6 @@ public:
         for( int j = 0; j < n; ++j  ) {
             y[j] = ystart - dy / 2 + j * dy;
         }
-
-        std::cout << m << ", " << n << ", " << tend << ", " << std::flush;
     }
 
     /** Destructs an object (it only frees the allocated memory).
@@ -452,8 +452,8 @@ void ShallowWater2D::Solver ()
 int main( int argc, char** argv )
 {
     int    nThreads = argc >= 2 ? atoi   ( argv[1]       ) : -1   ;
-    int    mSize    = argc >= 3 ? atoi   ( argv[2]       ) : 1024 ;
-    int    nSize    = argc >= 4 ? atoi   ( argv[3]       ) : 1024 ;
+    int    mSize    = argc >= 3 ? atoi   ( argv[2]       ) : 1000 ;
+    int    nSize    = argc >= 4 ? atoi   ( argv[3]       ) : 1000 ;
     double tEnd     = argc >= 5 ? strtod ( argv[4], NULL ) : 0.1  ;
     int    useVTK   = argc >= 6 ? atoi   ( argv[5]       ) : 0    ;
 

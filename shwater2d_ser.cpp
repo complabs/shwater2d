@@ -141,29 +141,24 @@ public:
         double ypos   = 1.0  //!< The bump y-position
     )
     {
-        #pragma omp parallel
+        for( int i = 0; i < m; ++i )
         {
-            #pragma omp for collapse(2)
-            for( int i = 0; i < m; ++i )
+            for( int j = 0; j < n; ++j )
             {
-                for( int j = 0; j < n; ++j )
-                {
-                    Qh( i, j ) = height;
-                    Qu( i, j ) = 0.0;
-                    Qv( i, j ) = 0.0;
-                }
+                Qh( i, j ) = height;
+                Qu( i, j ) = 0.0;
+                Qv( i, j ) = 0.0;
             }
+        }
 
-            #pragma omp for collapse(2)
-            for( int i = 1; i < m - 1; ++i )
+        for( int i = 1; i < m - 1; ++i )
+        {
+            for( int j = 1; j < n - 1; ++j )
             {
-                for( int j = 1; j < n - 1; ++j )
-                {
-                    Qh( i, j ) = height
-                        + eps * exp( - (   SQR( x[i] - xpos )
-                                         + SQR( y[j] - ypos )
-                                       ) / SQR( delta ) );
-                }
+                Qh( i, j ) = height
+                    + eps * exp( - (   SQR( x[i] - xpos )
+                                     + SQR( y[j] - ypos )
+                                   ) / SQR( delta ) );
             }
         }
     }
@@ -223,7 +218,6 @@ private:
         //
         const double bc_mask[ GF::count ] = { 1.0, -1.0, -1.0 }; 
 
-        #pragma omp for collapse(2)
         for( int j = 1; j < n - 1; ++j )
         {
             for( int gf = 0; gf < GF::count; ++gf )
@@ -233,7 +227,6 @@ private:
             }
         }
 
-        #pragma omp for collapse(2)
         for( int j = 0; j < m; ++j )
         {
             for( int gf = 0; gf < GF::count; ++gf )
@@ -323,7 +316,6 @@ void ShallowWater2D::laxf_scheme_2d
     ///////////////////////////////////////////////////////////////////////////
     // Loop along the y-direction
     //
-    #pragma omp for
     for( int j = 1; j < n; ++j )
     {
         // Calculate the flux functions in the x-direction.
@@ -363,7 +355,6 @@ void ShallowWater2D::laxf_scheme_2d
     ///////////////////////////////////////////////////////////////////////////
     // Loop along the x-direction
     //
-    #pragma omp for
     for( int i = 1; i < m; ++i )
     {
         // Calculate the flux functions in the y-direction.
@@ -411,49 +402,43 @@ void ShallowWater2D::Solver ()
 
     int steps = std::ceil( tend / dt );
 
-    #pragma omp parallel
+    // Allocate memory for the fluxes in the x- and y-direction
+    //
+    double** ffx = new double*[ GF::count ];
+    double** nFx = new double*[ GF::count ];
+    double** ffy = new double*[ GF::count ];
+    double** nFy = new double*[ GF::count ];
+
+    ffx[0] = new double[ GF::count * m ];
+    nFx[0] = new double[ GF::count * m ];
+    ffy[0] = new double[ GF::count * n ];
+    nFy[0] = new double[ GF::count * n ];
+
+    for( int gf = 1; gf < GF::count; ++gf )
     {
-        #pragma omp master
-        std::cout <<  omp_get_num_threads () << ", " << std::flush;
-
-        // Allocate memory for the fluxes in the x- and y-direction
-        //
-        double** ffx = new double*[ GF::count ];
-        double** nFx = new double*[ GF::count ];
-        double** ffy = new double*[ GF::count ];
-        double** nFy = new double*[ GF::count ];
-
-        ffx[0] = new double[ GF::count * m ];
-        nFx[0] = new double[ GF::count * m ];
-        ffy[0] = new double[ GF::count * n ];
-        nFy[0] = new double[ GF::count * n ];
-
-        for( int gf = 1; gf < GF::count; ++gf )
-        {
-            ffx[gf] = ffx[0] + gf * m;
-            nFx[gf] = nFx[0] + gf * m;
-            ffy[gf] = ffy[0] + gf * n;
-            nFy[gf] = nFy[0] + gf * n;
-        }
-
-        // Apply the boundary conditions then 
-        // update all the volumes using the Lax-Friedrich's scheme.
-        //
-        double time = 0;
-        for( int i = 0; i < steps; ++i, time += dt )
-        {
-            apply_boundary_conditions ();
-            laxf_scheme_2d( ffx, ffy, nFx, nFy );
-        }
-
-        // Free the memory reserved for the fluxes
-        //
-        delete[] ffx[0];   delete[] ffx;
-        delete[] nFx[0];   delete[] nFx;
-
-        delete[] ffy[0];   delete[] ffy;
-        delete[] nFy[0];   delete[] nFy;
+        ffx[gf] = ffx[0] + gf * m;
+        nFx[gf] = nFx[0] + gf * m;
+        ffy[gf] = ffy[0] + gf * n;
+        nFy[gf] = nFy[0] + gf * n;
     }
+
+    // Apply the boundary conditions then 
+    // update all the volumes using the Lax-Friedrich's scheme.
+    //
+    double time = 0;
+    for( int i = 0; i < steps; ++i, time += dt )
+    {
+        apply_boundary_conditions ();
+        laxf_scheme_2d( ffx, ffy, nFx, nFy );
+    }
+
+    // Free the memory reserved for the fluxes
+    //
+    delete[] ffx[0];   delete[] ffx;
+    delete[] nFx[0];   delete[] nFx;
+
+    delete[] ffy[0];   delete[] ffy;
+    delete[] nFy[0];   delete[] nFy;
 
     std::cout << ( gettime() - stime ) << std::endl;
 }

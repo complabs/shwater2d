@@ -5,6 +5,8 @@ obj
 *.depend
 *.o
 shwater2d
+shwater2d_par
+shwater2d_ser
 shwater2d_opt
 orig/shwater2d
 orig/shwater2d_naive
